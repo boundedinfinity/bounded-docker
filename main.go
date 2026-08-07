@@ -1,256 +1,330 @@
 package main
 
-// import (
-// 	"context"
-// 	"fmt"
-// 	"os"
-// 	"os/signal"
-// 	"sync"
-
-// 	"github.com/moby/moby/client"
-// )
-
-// func main() {
-// 	signalCh := make(chan os.Signal, 1)
-// 	signal.Notify(signalCh, os.Interrupt)
-// 	ctx, cancel := context.WithCancel(context.Background())
-
-// 	go func() {
-// 		<-signalCh
-// 		cancel()
-// 	}()
-
-// 	var wg sync.WaitGroup
-// 	wg.Add(1)
-
-// 	apiClient, err := client.New(
-// 		client.FromEnv,
-// 		client.WithUserAgent("my-application/1.0.0"),
-// 	)
-// 	if err != nil {
-// 		print("error creating docker client: ")
-// 		panic(err)
-// 	}
-// 	defer apiClient.Close()
-
-// 	result, err := apiClient.ContainerList(ctx, client.ContainerListOptions{
-// 		All: true,
-// 	})
-// 	if err != nil {
-// 		print("error listing docker containers: ")
-// 		panic(err)
-// 	}
-
-// 	fmt.Printf("%s  %-22s  %s\n", "ID", "STATUS", "IMAGE")
-// 	for _, ctr := range result.Items {
-// 		fmt.Printf("%s  %-22s  %s\n", ctr.ID, ctr.Status, ctr.Image)
-// 	}
-
-// 	events := apiClient.Events(ctx, client.EventsListOptions{})
-
-// 	go func() {
-// 		defer wg.Done()
-// 		for {
-// 			select {
-// 			case <-ctx.Done():
-// 				return
-// 			case msg := <-events.Messages:
-// 				fmt.Println(msg)
-// 			case err := <-events.Err:
-// 				fmt.Println(err)
-// 			}
-// 		}
-// 	}()
-
-// 	wg.Wait()
-// }
-
 import (
+	"context"
 	"fmt"
 	"os"
+	"os/signal"
+	"strings"
+	"sync"
 
-	"charm.land/bubbles/v2/table"
-	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
+	"github.com/boundedinfinity/docker-tui/docker"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/events"
+	"github.com/moby/moby/client"
+
+	"github.com/gdamore/tcell/v2"
+	"github.com/rivo/tview"
 )
 
-var baseStyle = lipgloss.NewStyle().
-	BorderStyle(lipgloss.NormalBorder()).
-	BorderForeground(lipgloss.Color("240"))
+func main() {
+	tui := newTui()
+	signalCh := make(chan os.Signal, 1)
+	signal.Notify(signalCh, os.Interrupt)
 
-type model struct {
-	table table.Model
+	go func() {
+		<-signalCh
+		tui.cancel()
+	}()
+
+	tui.loop()
+	tui.ui()
+	tui.runUpdateContainerList()
+	tui.wg.Wait()
 }
 
-func (m model) Init() tea.Cmd { return nil }
+func newTui() *tui {
+	api, err := client.New(
+		client.FromEnv,
+		client.WithUserAgent("bounded-docker/1.0.0"),
+	)
+	if err != nil {
+		panic(err)
+	}
 
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
-	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		m.table.SetWidth(msg.Width - 4)
-		m.table.SetHeight(msg.Height - 4)
-	case tea.KeyPressMsg:
-		switch msg.String() {
-		case "esc":
-			if m.table.Focused() {
-				m.table.Blur()
-			} else {
-				m.table.Focus()
+	this := &tui{
+		api:          api,
+		wg:           &sync.WaitGroup{},
+		errCh:        make(chan error),
+		itemsCh:      make(chan []container.Summary),
+		containerMap: make(map[string]container.Summary),
+		eventsCh:     make(chan events.Message),
+		cellPadding:  strings.Repeat(" ", 4),
+		options:      &tuiOptions{cellPadding: 1},
+		optionsCh:    make(chan tuiOptions),
+	}
+
+	this.ctx, this.cancel = context.WithCancel(context.Background())
+
+	this.createApp()
+	this.createFlexBox()
+	this.createTable()
+	this.createErrorBox()
+	this.flex.AddItem(this.table, 0, 1, false)
+	this.flex.AddItem(this.errors, 0, 1, false)
+
+	return this
+}
+
+type tui struct {
+	ctx          context.Context
+	cancel       context.CancelFunc
+	api          *client.Client
+	wg           *sync.WaitGroup
+	app          *tview.Application
+	flex         *tview.Flex
+	table        *tview.Table
+	errors       *tview.TextArea
+	cellPadding  string
+	headers      []string
+	errCh        chan error
+	itemsCh      chan []container.Summary
+	containerMap map[string]container.Summary
+	eventsCh     chan events.Message
+	options      *tuiOptions
+	optionsCh    chan tuiOptions
+}
+
+type tuiOptions struct {
+	cellPadding int
+}
+
+func (this *tui) close() {
+	this.app.Stop()
+	this.api.Close()
+	close(this.errCh)
+	close(this.itemsCh)
+}
+
+func (this *tui) ui() {
+	this.wg.Go(func() {
+		if err := this.app.SetRoot(this.flex, true).SetFocus(this.table).Run(); err != nil {
+			fmt.Println("Error running program:", err)
+			os.Exit(1)
+		}
+	})
+}
+
+func (this *tui) loop() error {
+	var gerr error
+
+	this.wg.Go(func() {
+		events := this.api.Events(this.ctx, client.EventsListOptions{})
+
+		for {
+			select {
+			case <-this.ctx.Done():
+				this.close()
+				return
+			case err := <-this.errCh:
+				this.handleErr(err)
+			case message := <-events.Messages:
+				this.handleMessage(message)
+			case err := <-events.Err:
+				this.sendErr(err)
+			case options := <-this.optionsCh:
+				this.handleOptions(options)
+			case items := <-this.itemsCh:
+				this.updateMap(items)
+				this.handlUpdateContainerList()
 			}
-		case "q", "ctrl+c":
-			return m, tea.Quit
-		case "enter":
-			return m, tea.Batch(
-				tea.Printf("Let's go to %s!", m.table.SelectedRow()[1]),
-			)
+		}
+	})
+
+	return gerr
+}
+
+func (this *tui) sendOptions(options tuiOptions) {
+	go func() { this.optionsCh <- options }()
+}
+
+func (this *tui) handleOptions(options tuiOptions) {
+	this.cellPadding = strings.Repeat(" ", options.cellPadding)
+	this.app.ForceDraw()
+}
+
+func (this *tui) handleMessage(message events.Message) {
+	switch message.Type {
+	case events.Type(docker.EventTypes.Container):
+		this.runUpdateContainerList()
+	default:
+		this.sendErr(fmt.Errorf("unhandled event type: %s", message.Type))
+	}
+}
+
+func (this *tui) updateMap(items []container.Summary) {
+	clear(this.containerMap)
+
+	for _, item := range items {
+		if _, ok := this.containerMap[item.ID]; !ok {
+			this.containerMap[item.ID] = item
+		} else {
+			this.sendErr(fmt.Errorf("already seen container: %s", item.ID))
 		}
 	}
-	m.table, cmd = m.table.Update(msg)
-	return m, cmd
 }
 
-func (m model) View() tea.View {
-	m.table.Help.ShowAll = true
-	return tea.NewView(baseStyle.Render(m.table.View()) + "\n  " + m.table.HelpView() + "\n")
+func (this *tui) sendErr(err error) {
+	if err != nil {
+		go func() { this.errCh <- err }()
+	}
 }
 
-func main() {
-	columns := []table.Column{
-		{Title: "Rank", Width: 4},
-		{Title: "City", Width: 10},
-		{Title: "Country", Width: 10},
-		{Title: "Population", Width: 10},
+func (this *tui) handleErr(err error) {
+	if err == nil || this.errors == nil || this.app == nil {
+		return
 	}
 
-	rows := []table.Row{
-		{"1", "Tokyo", "Japan", "37,274,000"},
-		{"2", "Delhi", "India", "32,065,760"},
-		{"3", "Shanghai", "China", "28,516,904"},
-		{"4", "Dhaka", "Bangladesh", "22,478,116"},
-		{"5", "São Paulo", "Brazil", "22,429,800"},
-		{"6", "Mexico City", "Mexico", "22,085,140"},
-		{"7", "Cairo", "Egypt", "21,750,020"},
-		{"8", "Beijing", "China", "21,333,332"},
-		{"9", "Mumbai", "India", "20,961,472"},
-		{"10", "Osaka", "Japan", "19,059,856"},
-		{"11", "Chongqing", "China", "16,874,740"},
-		{"12", "Karachi", "Pakistan", "16,839,950"},
-		{"13", "Istanbul", "Turkey", "15,636,243"},
-		{"14", "Kinshasa", "DR Congo", "15,628,085"},
-		{"15", "Lagos", "Nigeria", "15,387,639"},
-		{"16", "Buenos Aires", "Argentina", "15,369,919"},
-		{"17", "Kolkata", "India", "15,133,888"},
-		{"18", "Manila", "Philippines", "14,406,059"},
-		{"19", "Tianjin", "China", "14,011,828"},
-		{"20", "Guangzhou", "China", "13,964,637"},
-		{"21", "Rio De Janeiro", "Brazil", "13,634,274"},
-		{"22", "Lahore", "Pakistan", "13,541,764"},
-		{"23", "Bangalore", "India", "13,193,035"},
-		{"24", "Shenzhen", "China", "12,831,330"},
-		{"25", "Moscow", "Russia", "12,640,818"},
-		{"26", "Chennai", "India", "11,503,293"},
-		{"27", "Bogota", "Colombia", "11,344,312"},
-		{"28", "Paris", "France", "11,142,303"},
-		{"29", "Jakarta", "Indonesia", "11,074,811"},
-		{"30", "Lima", "Peru", "11,044,607"},
-		{"31", "Bangkok", "Thailand", "10,899,698"},
-		{"32", "Hyderabad", "India", "10,534,418"},
-		{"33", "Seoul", "South Korea", "9,975,709"},
-		{"34", "Nagoya", "Japan", "9,571,596"},
-		{"35", "London", "United Kingdom", "9,540,576"},
-		{"36", "Chengdu", "China", "9,478,521"},
-		{"37", "Nanjing", "China", "9,429,381"},
-		{"38", "Tehran", "Iran", "9,381,546"},
-		{"39", "Ho Chi Minh City", "Vietnam", "9,077,158"},
-		{"40", "Luanda", "Angola", "8,952,496"},
-		{"41", "Wuhan", "China", "8,591,611"},
-		{"42", "Xi An Shaanxi", "China", "8,537,646"},
-		{"43", "Ahmedabad", "India", "8,450,228"},
-		{"44", "Kuala Lumpur", "Malaysia", "8,419,566"},
-		{"45", "New York City", "United States", "8,177,020"},
-		{"46", "Hangzhou", "China", "8,044,878"},
-		{"47", "Surat", "India", "7,784,276"},
-		{"48", "Suzhou", "China", "7,764,499"},
-		{"49", "Hong Kong", "Hong Kong", "7,643,256"},
-		{"50", "Riyadh", "Saudi Arabia", "7,538,200"},
-		{"51", "Shenyang", "China", "7,527,975"},
-		{"52", "Baghdad", "Iraq", "7,511,920"},
-		{"53", "Dongguan", "China", "7,511,851"},
-		{"54", "Foshan", "China", "7,497,263"},
-		{"55", "Dar Es Salaam", "Tanzania", "7,404,689"},
-		{"56", "Pune", "India", "6,987,077"},
-		{"57", "Santiago", "Chile", "6,856,939"},
-		{"58", "Madrid", "Spain", "6,713,557"},
-		{"59", "Haerbin", "China", "6,665,951"},
-		{"60", "Toronto", "Canada", "6,312,974"},
-		{"61", "Belo Horizonte", "Brazil", "6,194,292"},
-		{"62", "Khartoum", "Sudan", "6,160,327"},
-		{"63", "Johannesburg", "South Africa", "6,065,354"},
-		{"64", "Singapore", "Singapore", "6,039,577"},
-		{"65", "Dalian", "China", "5,930,140"},
-		{"66", "Qingdao", "China", "5,865,232"},
-		{"67", "Zhengzhou", "China", "5,690,312"},
-		{"68", "Ji Nan Shandong", "China", "5,663,015"},
-		{"69", "Barcelona", "Spain", "5,658,472"},
-		{"70", "Saint Petersburg", "Russia", "5,535,556"},
-		{"71", "Abidjan", "Ivory Coast", "5,515,790"},
-		{"72", "Yangon", "Myanmar", "5,514,454"},
-		{"73", "Fukuoka", "Japan", "5,502,591"},
-		{"74", "Alexandria", "Egypt", "5,483,605"},
-		{"75", "Guadalajara", "Mexico", "5,339,583"},
-		{"76", "Ankara", "Turkey", "5,309,690"},
-		{"77", "Chittagong", "Bangladesh", "5,252,842"},
-		{"78", "Addis Ababa", "Ethiopia", "5,227,794"},
-		{"79", "Melbourne", "Australia", "5,150,766"},
-		{"80", "Nairobi", "Kenya", "5,118,844"},
-		{"81", "Hanoi", "Vietnam", "5,067,352"},
-		{"82", "Sydney", "Australia", "5,056,571"},
-		{"83", "Monterrey", "Mexico", "5,036,535"},
-		{"84", "Changsha", "China", "4,809,887"},
-		{"85", "Brasilia", "Brazil", "4,803,877"},
-		{"86", "Cape Town", "South Africa", "4,800,954"},
-		{"87", "Jiddah", "Saudi Arabia", "4,780,740"},
-		{"88", "Urumqi", "China", "4,710,203"},
-		{"89", "Kunming", "China", "4,657,381"},
-		{"90", "Changchun", "China", "4,616,002"},
-		{"91", "Hefei", "China", "4,496,456"},
-		{"92", "Shantou", "China", "4,490,411"},
-		{"93", "Xinbei", "Taiwan", "4,470,672"},
-		{"94", "Kabul", "Afghanistan", "4,457,882"},
-		{"95", "Ningbo", "China", "4,405,292"},
-		{"96", "Tel Aviv", "Israel", "4,343,584"},
-		{"97", "Yaounde", "Cameroon", "4,336,670"},
-		{"98", "Rome", "Italy", "4,297,877"},
-		{"99", "Shijiazhuang", "China", "4,285,135"},
-		{"100", "Montreal", "Canada", "4,276,526"},
+	text := strings.Join([]string{this.errors.GetText(), err.Error()}, "\n")
+	this.errors.SetText(text, false)
+	this.app.ForceDraw()
+}
+
+func (this *tui) clearErr() {
+	if this.errors == nil || this.app == nil {
+		return
 	}
 
-	t := table.New(
-		table.WithColumns(columns),
-		table.WithRows(rows),
-		table.WithFocused(true),
-		table.WithHeight(7),
-		table.WithWidth(42),
-	)
+	this.errors.SetText("", false)
+	this.app.ForceDraw()
+}
 
-	s := table.DefaultStyles()
-	s.Header = s.Header.
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(lipgloss.Color("240")).
-		BorderBottom(true).
-		Bold(false)
-	s.Selected = s.Selected.
-		Foreground(lipgloss.Color("229")).
-		Background(lipgloss.Color("57")).
-		Bold(false)
-	t.SetStyles(s)
-
-	m := model{t}
-	p := tea.NewProgram(m)
-	// p.Send()
-	if _, err := p.Run(); err != nil {
-		fmt.Println("Error running program:", err)
-		os.Exit(1)
+func (this *tui) handleKeyEvent(event *tcell.EventKey) *tcell.EventKey {
+	// bounded-docker.application.quit
+	if event.Key() == tcell.KeyEscape || event.Rune() == 'q' || event.Rune() == 'Q' {
+		this.cancel()
+		return nil
 	}
+
+	// bounded-docker.application.errors.clear
+	if event.Rune() == 'c' || event.Rune() == 'C' {
+		this.clearErr()
+		return nil
+	}
+
+	if event.Key() == tcell.KeyEnter {
+		// row, col := this.table.GetSelection()
+		// fmt.Println(row, col)
+	}
+
+	if event.Rune() == '+' || event.Rune() == '=' {
+		current := *this.options
+		current.cellPadding += 1
+		this.sendOptions(current)
+		return nil
+	}
+
+	if event.Rune() == '-' || event.Rune() == '_' {
+		current := *this.options
+		current.cellPadding -= 1
+		this.sendOptions(current)
+		return nil
+	}
+
+	return event
+}
+
+func (this *tui) createApp() {
+	this.app = tview.NewApplication()
+	this.app.SetInputCapture(this.handleKeyEvent)
+}
+
+func (this *tui) createFlexBox() {
+	this.flex = tview.NewFlex().
+		SetDirection(tview.FlexRow)
+}
+
+func (this *tui) createErrorBox() {
+	this.errors = tview.NewTextArea()
+	this.errors.SetTitle("Errors")
+	this.errors.SetBorder(true)
+}
+
+func (this *tui) createTable() {
+	this.headers = []string{"ID", "Names", "Image", "Status"}
+	cols := len(this.headers) - 1
+
+	this.table = tview.NewTable().
+		SetBorders(true).
+		SetFixed(1, cols).
+		SetSelectable(true, false).
+		SetDoneFunc(func(key tcell.Key) {
+			// if key == tcell.KeyEnter {
+			// 	this.table.SetSelectable(true, true)
+			// }
+		})
+
+	this.table.SetTitle("Containers")
+
+	for col := range this.headers {
+		this.table.SetCell(0, col, createHeaderCell(this.headers[col]))
+	}
+
+	this.table.Select(0, 0)
+}
+
+func createHeaderCell(text string) *tview.TableCell {
+	return tview.NewTableCell(text).
+		SetTextColor(tcell.ColorYellow).
+		SetAlign(tview.AlignCenter).
+		SetSelectable(false)
+}
+
+func (this *tui) createContainerCell(text string, id string) *tview.TableCell {
+	text = this.cellPadding + text + this.cellPadding
+
+	cell := tview.NewTableCell(text).
+		SetTextColor(tcell.ColorWhite).
+		SetAlign(tview.AlignLeft).
+		SetSelectable(true).
+		SetReference(id)
+
+	return cell
+}
+
+func (this *tui) runUpdateContainerList() {
+	this.wg.Go(func() {
+		if containerList, err := this.api.ContainerList(this.ctx, client.ContainerListOptions{All: true}); err == nil {
+			go func() { this.itemsCh <- containerList.Items }()
+		} else {
+			this.sendErr(err)
+		}
+	})
+}
+
+func (this *tui) summary2Row(summary container.Summary) []string {
+	type options struct {
+		trunc bool
+	}
+
+	normal := func(text string, options options) string {
+		text = strings.TrimSpace(text)
+
+		if options.trunc && len(text) > 12 {
+			return text[:12]
+		}
+
+		return text
+	}
+
+	return []string{
+		normal(summary.ID, options{trunc: true}),
+		normal(strings.Join(summary.Names, ", "), options{trunc: true}),
+		normal(summary.Image, options{trunc: true}),
+		normal(summary.Status, options{trunc: false}),
+	}
+}
+
+func (this *tui) handlUpdateContainerList() {
+	row := 0
+	for _, item := range this.containerMap {
+		row += 1
+		texts := this.summary2Row(item)
+		for col := range texts {
+			cell := this.createContainerCell(texts[col], item.ID)
+			this.table.SetCell(row, col, cell)
+		}
+	}
+
+	this.app.ForceDraw()
 }
