@@ -7,12 +7,19 @@ Reference application:
 - golang
     - [go-sdk](https://github.com/docker/go-sdk) for Docker
     - [Moby Project](https://pkg.go.dev/github.com/docker/docker@v28.5.2+incompatible)
-    - ~~[bubbletea](https://github.com/charmbracelet/bubbletea)~~
-        - ~~[bubbles](https://github.com/charmbracelet/bubbles)~~
-    - [tview](https://github.com/rivo/tview)
-        - [tview Wiki](https://github.com/rivo/tview/wiki)
-        - [Table](https://github.com/rivo/tview/wiki/Table)
-        - [TextArea](https://github.com/rivo/tview/wiki/TextArea)
+    - https://charm.land/
+    - [bubbletea](https://github.com/charmbracelet/bubbletea)
+        - [bubbles](https://github.com/charmbracelet/bubbles)
+        - [libgloss - styles](https://github.com/charmbracelet/lipgloss)
+        - [table example](https://github.com/charmbracelet/bubbletea/blob/main/examples/table/main.go)
+        - [table-resize example](https://github.com/charmbracelet/bubbletea/blob/main/examples/table-resize/main.go)
+        - [list-default example](https://github.com/charmbracelet/bubbletea/blob/main/examples/list-default/main.go)
+        - [help example](https://github.com/charmbracelet/bubbletea/blob/main/examples/help/main.go)
+    - ~~[tview](https://github.com/rivo/tview)~~
+        - ~~[tview Wiki](https://github.com/rivo/tview/wiki)~~
+        - ~~[Table](https://github.com/rivo/tview/wiki/Table)~~
+        - ~~[TextArea](https://github.com/rivo/tview/wiki/TextArea)~~
+        - ~~[Concurrency]https://github.com/rivo/tview/wiki/Concurrency~~
     - [Cobra](https://cobra.dev/) CLI framework
         - https://github.com/spf13/cobra
     - Wails
@@ -26,3 +33,4 @@ Reference application:
         - [docker system events](https://docs.docker.com/reference/cli/docker/system/events/)
         - `docker events --format=json | jq`
     - https://mobyproject.org/
+- [Keycodes](https://www.toptal.com/developers/keycode)

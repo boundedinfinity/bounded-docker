@@ -7,178 +7,146 @@ import (
 	"os/signal"
 	"sync"
 
-	"github.com/moby/moby/api/types/events"
-	"github.com/moby/moby/api/types/system"
-	"github.com/moby/moby/client"
+	"charm.land/bubbles/v2/table"
+	"github.com/boundedinfinity/docker-tui/docker"
 
-	"github.com/gdamore/tcell/v2"
-	"github.com/rivo/tview"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	"github.com/moby/moby/api/types/container"
 )
 
+var baseStyle = lipgloss.NewStyle().
+	BorderStyle(lipgloss.NormalBorder()).
+	BorderForeground(lipgloss.Color("240"))
+
+type model struct {
+	ctx         context.Context
+	cancel      context.CancelFunc
+	table       table.Model
+	columns     []table.Column
+	rows        []table.Row
+	windowWidth int
+	em          errModel
+}
+
+func (this model) Init() tea.Cmd {
+	return nil
+}
+
+func (this model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+
+	select {
+	case <-this.ctx.Done():
+		return this, tea.Quit
+	default:
+	}
+
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		this.windowWidth = msg.Width
+		this.table = createContainerTable(msg.Width, this.columns, this.rows)
+	case tea.KeyPressMsg:
+		switch msg.String() {
+		case "esc":
+			if this.table.Focused() {
+				this.table.Blur()
+			} else {
+				this.table.Focus()
+			}
+		case "q", "ctrl+c":
+			this.cancel()
+			return this, nil
+		case "enter":
+			return this, tea.Batch(
+				tea.Printf("Let's go to %s!", this.table.SelectedRow()[1]),
+			)
+		}
+	case error:
+		return this, nil
+	case []container.Summary:
+		this.rows = make([]table.Row, 0, len(msg))
+
+		for i := range msg {
+			this.rows = append(this.rows, table.Row{
+				msg[i].ID,
+				msg[i].Image,
+				msg[i].Command,
+				msg[i].Status,
+			})
+		}
+	}
+
+	this.table, cmd = this.table.Update(msg)
+	return this, cmd
+}
+
+func (this model) View() tea.View {
+	join := lipgloss.JoinHorizontal(
+		0,
+		this.table.View(),
+		this.table.HelpView(),
+		this.em,
+	)
+
+	return tea.NewView(baseStyle.Render(join))
+}
+
 func main() {
-	tui := newTui()
-	signalCh := make(chan os.Signal, 1)
-	signal.Notify(signalCh, os.Interrupt)
+	ctx, cancel := context.WithCancel(context.Background())
+	wg := &sync.WaitGroup{}
+	sigCh := make(chan os.Signal, 1)
+	d, err := docker.NewDocker(wg, ctx)
+
+	signal.Notify(sigCh, os.Interrupt)
 
 	go func() {
-		<-signalCh
-		tui.cancel()
+		<-sigCh
+		cancel()
 	}()
 
-	tui.loop()
-	tui.ui()
-	tui.summaries.route.get()
-	tui.dockerInfoSend()
-	tui.wg.Wait()
-}
-
-func newTui() *tui {
-	api, err := client.New(
-		client.FromEnv,
-		client.WithUserAgent("bounded-docker/1.0.0"),
-	)
 	if err != nil {
-		panic(err)
+		fmt.Println("Error creating Docker client:", err)
+		os.Exit(1)
 	}
 
-	this := &tui{
-		api: api,
-		wg:  &sync.WaitGroup{},
-		errors: errorsInfo{
-			ch:    make(chan error),
-			items: make([]error, 0),
+	rows := []table.Row{}
+
+	m := model{
+		columns: []table.Column{
+			{Title: "ID"},
+			{Title: "Image"},
+			{Title: "Command"},
+			{Title: "Status"},
 		},
-		dockerInfo: dockerInfo{
-			ch:   make(chan system.Info),
-			info: system.Info{},
-		},
-		eventsCh:  make(chan events.Message),
-		optionsCh: make(chan tuiOptions),
-		options: tuiOptions{
-			cellPadding:     10,
-			cellWidth:       50,
-			backgroundColor: tcell.ColorWhite,
-			foregroundColor: tcell.ColorBlack,
-			titleColor:      tcell.ColorBlack,
-			headerCorlor:    tcell.ColorBlack,
-		},
+		rows: rows,
+		em:   createErrorView(),
 	}
+	m.table = createContainerTable(0, m.columns, m.rows)
 
-	this.ctx, this.cancel = context.WithCancel(context.Background())
+	p := tea.NewProgram(m)
 
-	this.createApp()
-	this.errCreate()
-
-	this.summaries = newSummariesInfo(this, this.errors.ch)
-	this.infoCreate()
-	this.flex.AddItem(this.summaries.table, 0, 1, false)
-	this.flex.AddItem(this.errors.table, 0, 1, false)
-
-	this.errDraw()
-
-	return this
-}
-
-type tui struct {
-	ctx              context.Context
-	cancel           context.CancelFunc
-	api              *client.Client
-	wg               *sync.WaitGroup
-	app              *tview.Application
-	flex             *tview.Flex
-	errors           errorsInfo
-	summaries        summariesInfo
-	dockerInfo       dockerInfo
-	eventsCh         chan events.Message
-	optionsCh        chan tuiOptions
-	options          tuiOptions
-	containersTitlef string
-}
-
-func (this *tui) close() {
-	this.app.Stop()
-	this.api.Close()
-}
-
-func (this *tui) ui() {
-	this.wg.Go(func() {
-		if err := this.app.SetRoot(this.flex, true).SetFocus(this.summaries.table).Run(); err != nil {
+	wg.Go(func() {
+		if _, err := p.Run(); err != nil {
 			fmt.Println("Error running program:", err)
 			os.Exit(1)
 		}
 	})
-}
 
-func (this *tui) loop() error {
-	var gerr error
-
-	this.wg.Go(func() {
-		events := this.api.Events(this.ctx, client.EventsListOptions{})
-
+	wg.Go(func() {
 		for {
-			redraw := false
-
 			select {
-			case <-this.ctx.Done():
-				this.close()
+			case <-ctx.Done():
 				return
-			case err := <-this.errors.ch:
-				redraw = this.errHandle(err)
-			case message := <-events.Messages:
-				redraw = this.eventHandle(message)
-			case err := <-events.Err:
-				this.errSend(err)
-			case options := <-this.optionsCh:
-				redraw = this.handleOptions(options)
-			case result := <-this.summaries.route.ch:
-				redraw = this.summaries.handle(result)
-			case info := <-this.dockerInfo.ch:
-				redraw = this.dockerInfoHandle(info)
-			}
-
-			if redraw {
-				this.app.ForceDraw()
+			case err := <-d.ErrCh:
+				p.Send(err)
+			case summary := <-d.SummaryCh:
+				p.Send(summary)
 			}
 		}
 	})
 
-	return gerr
-}
+	d.GetSummary()
 
-func (this *tui) createApp() {
-	this.app = tview.NewApplication()
-	this.app.SetInputCapture(this.keyHandle)
-	this.flex = tview.NewFlex().SetDirection(tview.FlexRow)
-	// this.flex.
-	// 	// SetBorderPadding(1, 1, 2, 2).
-	// 	SetBackgroundColor(tcell.ColorWhite)
-}
-
-func newThing[T any](getfn func() (T, error), errs chan error) *listThing[T] {
-	return &listThing[T]{
-		ch:    make(chan T),
-		getfn: getfn,
-		errs:  errs,
-	}
-}
-
-type listThing[T any] struct {
-	ch       chan T
-	getfn    func() (T, error)
-	errs     chan error
-	handleFn func(T) bool
-}
-
-func (this *listThing[T]) get() {
-	if this.ch == nil || this.getfn == nil {
-		return
-	}
-
-	go func() {
-		if result, err := this.getfn(); err == nil {
-			this.ch <- result
-		} else {
-			this.errs <- err
-		}
-	}()
+	wg.Wait()
 }

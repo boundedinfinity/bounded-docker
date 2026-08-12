@@ -1,55 +1,63 @@
 package main
 
 import (
-	"fmt"
-
-	"github.com/rivo/tview"
+	"charm.land/bubbles/v2/list"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
-type errorsInfo struct {
-	ch    chan error
-	items []error
-	table *tview.Table
+var docStyle = lipgloss.NewStyle().Margin(1, 2)
+
+type errItem struct {
+	err error
 }
 
-func (this *tui) errHandle(err error) bool {
-	if err == nil || this.errors.table == nil || this.app == nil {
-		return false
+func (this errItem) Title() string {
+	return this.err.Error()
+}
+
+func (this errItem) FilterValue() string {
+	return this.err.Error()
+}
+
+type errModel struct {
+	list list.Model
+	errs []error
+}
+
+func (m errModel) Init() tea.Cmd {
+	return nil
+}
+
+func (m errModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case error:
+		m.errs = append(m.errs, msg)
 	}
 
-	this.errors.items = append(this.errors.items, err)
-	this.errDraw()
-	return true
+	var cmd tea.Cmd
+	m.list, cmd = m.list.Update(msg)
+	return m, cmd
 }
 
-func (this *tui) errDraw() {
-	this.errors.table.SetTitle(fmt.Sprintf(" [ errors:%d ]", len(this.errors.items)))
-	this.errors.table.Clear()
-
-	for row, err := range this.errors.items {
-		cell := tview.NewTableCell(err.Error()).
-			SetTextColor(this.options.foregroundColor)
-		this.errors.table.SetCell(row, 0, cell)
+func (m errModel) View() tea.View {
+	items := make([]list.Item, len(m.errs))
+	for i, err := range m.errs {
+		items[i] = errItem{err: err}
 	}
+
+	m.list.SetItems(items)
+
+	v := tea.NewView(docStyle.Render(m.list.View()))
+	v.AltScreen = true
+	return v
 }
 
-func (this *tui) errSend(err error) {
-	if err != nil && this.errors.ch != nil {
-		go func() { this.errors.ch <- err }()
+func createErrorView() errModel {
+	l := list.New([]list.Item{}, list.NewDefaultDelegate(), 0, 0)
+	l.Title = "Errors"
+	return errModel{
+		list: l,
+		errs: make([]error, 0),
 	}
-}
-
-func (this *tui) errClear() {
-	clear(this.errors.items)
-	this.errDraw()
-}
-
-func (this *tui) errCreate() {
-	this.errors.table = tview.NewTable()
-	this.errors.table.
-		SetTitleAlign(tview.AlignCenter).
-		SetBorder(true).
-		SetBackgroundColor(this.options.backgroundColor).
-		SetBorderColor(this.options.foregroundColor).
-		SetTitleColor(this.options.titleColor)
 }
