@@ -7,33 +7,40 @@ import (
 	"os/signal"
 	"sync"
 
-	"charm.land/bubbles/v2/table"
 	"github.com/boundedinfinity/docker-tui/docker"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/moby/moby/api/types/container"
 )
 
-var baseStyle = lipgloss.NewStyle().
-	BorderStyle(lipgloss.NormalBorder()).
-	BorderForeground(lipgloss.Color("240"))
+var _ tea.Model = &appModel{}
 
-type model struct {
-	ctx         context.Context
-	cancel      context.CancelFunc
-	table       table.Model
-	columns     []table.Column
-	rows        []table.Row
-	windowWidth int
-	em          errModel
+func newApp(ctx context.Context, cancel context.CancelFunc) *appModel {
+	m := &appModel{
+		ctx:         ctx,
+		cancel:      cancel,
+		summaries:   newSummaryModel(),
+		errorModels: newErrorModel(),
+		style: lipgloss.NewStyle().
+			BorderStyle(lipgloss.NormalBorder()).
+			BorderForeground(lipgloss.Color("240")),
+	}
+	return m
 }
 
-func (this model) Init() tea.Cmd {
+type appModel struct {
+	style       lipgloss.Style
+	ctx         context.Context
+	cancel      context.CancelFunc
+	summaries   tea.Model
+	errorModels tea.Model
+}
+
+func (this *appModel) Init() tea.Cmd {
 	return nil
 }
 
-func (this model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (this *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	select {
@@ -44,52 +51,45 @@ func (this model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		this.windowWidth = msg.Width
-		this.table = createContainerTable(msg.Width, this.columns, this.rows)
+		// this.windowWidth = msg.Width
+		// this.table = createContainerTable(msg.Width, this.columns, this.rows)
 	case tea.KeyPressMsg:
 		switch msg.String() {
-		case "esc":
-			if this.table.Focused() {
-				this.table.Blur()
-			} else {
-				this.table.Focus()
-			}
+		// case "esc":
+		// 	if this.table.Focused() {
+		// 		this.table.Blur()
+		// 	} else {
+		// 		this.table.Focus()
+		// 	}
 		case "q", "ctrl+c":
 			this.cancel()
 			return this, nil
 		case "enter":
-			return this, tea.Batch(
-				tea.Printf("Let's go to %s!", this.table.SelectedRow()[1]),
-			)
+			// return this, tea.Batch(
+			// 	tea.Printf("Let's go to %s!", this.table.SelectedRow()[1]),
+			// )
 		}
 	case error:
 		return this, nil
-	case []container.Summary:
-		this.rows = make([]table.Row, 0, len(msg))
-
-		for i := range msg {
-			this.rows = append(this.rows, table.Row{
-				msg[i].ID,
-				msg[i].Image,
-				msg[i].Command,
-				msg[i].Status,
-			})
-		}
 	}
 
-	this.table, cmd = this.table.Update(msg)
+	this.summaries, cmd = this.summaries.Update(msg)
 	return this, cmd
 }
 
-func (this model) View() tea.View {
-	join := lipgloss.JoinHorizontal(
-		0,
-		this.table.View(),
-		this.table.HelpView(),
-		this.em,
-	)
+func (this appModel) View() tea.View {
+	// join := lipgloss.JoinHorizontal(
+	// 	0,
+	// 	this.summaries.View().Content,
+	// )
 
-	return tea.NewView(baseStyle.Render(join))
+	v := tea.NewView(this.summaries.View().Content)
+
+	v.AltScreen = true
+	v.WindowTitle = "Bounded Docker"
+	return v
+
+	// return tea.NewView("Ths is a test")
 }
 
 func main() {
@@ -100,35 +100,24 @@ func main() {
 
 	signal.Notify(sigCh, os.Interrupt)
 
-	go func() {
-		<-sigCh
-		cancel()
-	}()
-
 	if err != nil {
 		fmt.Println("Error creating Docker client:", err)
 		os.Exit(1)
 	}
 
-	rows := []table.Row{}
-
-	m := model{
-		columns: []table.Column{
-			{Title: "ID"},
-			{Title: "Image"},
-			{Title: "Command"},
-			{Title: "Status"},
-		},
-		rows: rows,
-		em:   createErrorView(),
-	}
-	m.table = createContainerTable(0, m.columns, m.rows)
-
+	m := newApp(ctx, cancel)
 	p := tea.NewProgram(m)
+
+	go func() {
+		<-sigCh
+		cancel()
+		p.Quit()
+	}()
 
 	wg.Go(func() {
 		if _, err := p.Run(); err != nil {
 			fmt.Println("Error running program:", err)
+			cancel()
 			os.Exit(1)
 		}
 	})

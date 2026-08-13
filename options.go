@@ -1,17 +1,13 @@
 package main
 
-import (
-	"github.com/gdamore/tcell/v2"
-)
-
-type tuiOptions struct {
-	cellPadding     int
-	cellWidth       int
-	backgroundColor tcell.Color
-	foregroundColor tcell.Color
-	titleColor      tcell.Color
-	headerCorlor    tcell.Color
-}
+// type tuiOptions struct {
+// 	cellPadding     int
+// 	cellWidth       int
+// 	backgroundColor tcell.Color
+// 	foregroundColor tcell.Color
+// 	titleColor      tcell.Color
+// 	headerCorlor    tcell.Color
+// }
 
 // func (this *tui) sendOptions(options tuiOptions) {
 // 	go func() { this.optionsCh <- options }()

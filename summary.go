@@ -1,97 +1,154 @@
 package main
 
-// func newSummariesInfo(tui *tui, errs chan error) summariesInfo {
-// 	this := summariesInfo{
-// 		tui:   tui,
-// 		items: make([]container.Summary, 0),
-// 		route: listThing[client.ContainerListResult]{
-// 			ch:   make(chan client.ContainerListResult),
-// 			errs: errs,
-// 			getfn: func() (client.ContainerListResult, error) {
-// 				return tui.api.ContainerList(tui.ctx, client.ContainerListOptions{All: true})
-// 			},
-// 		},
+import (
+	"strings"
+
+	"charm.land/bubbles/v2/table"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	"github.com/moby/moby/api/types/container"
+)
+
+var _ tea.Model = summaryModel{}
+
+func newSummaryModel() tea.Model {
+	columns := []table.Column{
+		{Title: "ID"},
+		{Title: "Name"},
+		{Title: "Image"},
+		{Title: "Command"},
+		{Title: "Status"},
+	}
+
+	// rows := []table.Row{}
+	rows := []table.Row{
+		{"1234567890", "my-container", "my-image", "/bin/bash", "Up 5 minutes"},
+	}
+
+	// https://github.com/charmbracelet/lipgloss/tree/v2.0.6#rendering-tables
+	t := table.New(
+		table.WithColumns(columns),
+		table.WithRows(rows),
+		table.WithHeight(0),
+		table.WithWidth(0),
+	)
+
+	t.Help.ShowAll = false
+
+	return summaryModel{
+		// styles: getSummaryStyles(),
+		table: t,
+	}
+}
+
+func getSummaryStyles() lipgloss.Style {
+	return lipgloss.NewStyle().
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(lipgloss.Color("240"))
+}
+
+type summaryModel struct {
+	// styles    lipgloss.Style
+	table     table.Model
+	summaries []container.Summary
+}
+
+func (this *summaryModel) SetSummaries(summaries []container.Summary) {
+	this.summaries = summaries
+}
+
+func (this *summaryModel) ClearSummaries() {
+	this.summaries = []container.Summary{}
+}
+
+func (this summaryModel) Init() tea.Cmd {
+	return nil
+}
+
+func summary2Row(summary container.Summary) table.Row {
+	names := strings.Join(summary.Names, ", ")
+	return table.Row{
+		summary.ID,
+		names,
+		summary.Image,
+		summary.Command,
+		summary.Status,
+	}
+}
+
+func (this summaryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		this.table.SetHeight(msg.Height - 10)
+		this.table.SetWidth(msg.Width - 50)
+	case tea.BackgroundColorMsg:
+		_ = msg.IsDark()
+	case []container.Summary:
+		this.summaries = msg
+		rows := make([]table.Row, len(this.summaries))
+		for i := range this.summaries {
+			rows[i] = summary2Row(this.summaries[i])
+		}
+		this.table.SetRows(rows)
+	}
+
+	this.table, cmd = this.table.Update(msg)
+	return this, cmd
+}
+
+func (this summaryModel) View() tea.View {
+	v := tea.NewView(this.table.View())
+	// v.WindowTitle = "Containers"
+
+	return v
+}
+
+// func createContainerTable(pageWidth int, columns []table.Column, rows []table.Row) table.Model {
+// 	pagePadding := 20
+// 	columnPadding := 5
+
+// 	tableWidth := max(0, pageWidth-pagePadding) // account for borders
+// 	columnWidth := int(tableWidth/len(columns)) + columnPadding
+// 	widths := make([]int, len(columns))
+
+// 	for i := range columns {
+// 		widths[i] = max(widths[i], columns[i].Width)
 // 	}
 
-// 	this.create()
-// 	this.draw()
-// 	return this
-// }
-
-// type summariesInfo struct {
-// 	tui   *tui
-// 	items []container.Summary
-// 	table *tview.Table
-// 	route listThing[client.ContainerListResult]
-// }
-
-// func (this *summariesInfo) handle(result client.ContainerListResult) bool {
-// 	if result.Items == nil || this.table == nil || this.tui.app == nil {
-// 		return false
-// 	}
-
-// 	this.items = result.Items
-// 	this.draw()
-// 	return true
-// }
-
-// func (this *summariesInfo) draw() {
-// 	this.table.Clear()
-// 	headers := []string{"ID", "NAMES", "IMAGE", "STATUS"}
-// 	this.table.SetTitle(fmt.Sprintf(" [ containers:%d ]", len(this.items)))
-
-// 	type options struct {
-// 		trunc bool
-// 	}
-
-// 	normal := func(text string, options options) string {
-// 		text = strings.TrimSpace(text)
-
-// 		if options.trunc && len(text) > this.tui.options.cellWidth {
-// 			return text[:this.tui.options.cellWidth-3] + "..."
+// 	for r := range rows {
+// 		for i := range rows[r] {
+// 			widths[i] = max(widths[i], len(rows[r][i]))
 // 		}
-
-// 		return text
 // 	}
 
-// 	var rows [][]string
-// 	rows = append(rows, headers)
-
-// 	for _, summary := range this.items {
-// 		rows = append(rows, []string{
-// 			normal(summary.ID, options{trunc: true}),
-// 			normal(strings.Join(summary.Names, ", "), options{trunc: true}),
-// 			normal(summary.Image, options{trunc: true}),
-// 			normal(summary.Status, options{trunc: false}),
-// 		})
+// 	for i := range columns {
+// 		columns[i].Width = min(columnWidth, widths[i]+columnPadding)
 // 	}
 
-// 	for row, cols := range rows {
-// 		for col, text := range cols {
-// 			if col > 0 {
-// 				text = this.tui.cellPadding(text)
-// 			}
+// 	t := table.New(
+// 		table.WithColumns(columns),
+// 		table.WithRows(rows),
+// 		table.WithFocused(true),
+// 		table.WithHeight(7),
+// 		table.WithWidth(tableWidth),
+// 	)
 
-// 			cell := tview.NewTableCell(text)
+// 	s := table.DefaultStyles()
 
-// 			if row == 0 {
-// 				cell.SetTextColor(this.tui.options.headerCorlor)
-// 			} else {
-// 				cell.SetTextColor(this.tui.options.foregroundColor)
-// 			}
+// 	s.Header = s.Header.
+// 		BorderStyle(lipgloss.NormalBorder()).
+// 		BorderForeground(lipgloss.Color("240")).
+// 		BorderBottom(true).
+// 		Bold(false)
 
-// 			this.table.SetCell(row, col, cell)
-// 		}
-// 	}
-// }
+// 	s.Selected = s.Selected.
+// 		Foreground(lipgloss.Color("229")).
+// 		Background(lipgloss.Color("57")).
+// 		Bold(false)
 
-// func (this *summariesInfo) create() {
-// 	this.table = tview.NewTable()
-// 	this.table.
-// 		SetTitleAlign(tview.AlignCenter).
-// 		SetBorder(true).
-// 		SetBackgroundColor(this.tui.options.backgroundColor).
-// 		SetTitleColor(this.tui.options.titleColor)
+// 	t.SetStyles(s)
 
-// 	this.table.SetBorderColor(this.tui.options.foregroundColor)
+// 	return t
 // }
