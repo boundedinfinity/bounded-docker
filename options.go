@@ -1,24 +1,16 @@
 package main
 
-// type tuiOptions struct {
-// 	cellPadding     int
-// 	cellWidth       int
-// 	backgroundColor tcell.Color
-// 	foregroundColor tcell.Color
-// 	titleColor      tcell.Color
-// 	headerCorlor    tcell.Color
-// }
+type Focusable interface {
+	Focus()
+	Blur()
+}
 
-// func (this *tui) sendOptions(options tuiOptions) {
-// 	go func() { this.optionsCh <- options }()
-// }
-
-// func (this *tui) handleOptions(options tuiOptions) bool {
-// 	this.options.cellPadding = options.cellPadding
-// 	return true
-// }
-
-// func (this *tui) cellPadding(text string) string {
-// 	padding := strings.Repeat(" ", this.options.cellPadding)
-// 	return padding + text + padding
+// func clamp(value, min, max int) int {
+// 	if value < min {
+// 		return min
+// 	}
+// 	if value > max {
+// 		return max
+// 	}
+// 	return value
 // }

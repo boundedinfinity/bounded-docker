@@ -11,40 +11,45 @@ import (
 
 var _ tea.Model = summaryModel{}
 
-func newSummaryModel() tea.Model {
+func newSummaryModel(summaries []container.Summary) tea.Model {
 	columns := []table.Column{
-		{Title: "ID"},
-		{Title: "Name"},
-		{Title: "Image"},
-		{Title: "Command"},
-		{Title: "Status"},
+		{Title: "ID", Width: 30},
+		{Title: "Name", Width: 30},
+		{Title: "Image", Width: 30},
+		{Title: "Command", Width: 30},
+		{Title: "Status", Width: 30},
 	}
 
-	// rows := []table.Row{}
-	rows := []table.Row{
-		{"1234567890", "my-container", "my-image", "/bin/bash", "Up 5 minutes"},
-	}
+	styles := table.DefaultStyles()
 
 	// https://github.com/charmbracelet/lipgloss/tree/v2.0.6#rendering-tables
 	t := table.New(
 		table.WithColumns(columns),
-		table.WithRows(rows),
+		table.WithRows(summaries2Rows(summaries)),
 		table.WithHeight(0),
 		table.WithWidth(0),
+		table.WithStyles(styles),
 	)
 
+	s := table.DefaultStyles()
+	s.Header = s.Header.
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(lipgloss.Color("240")).
+		BorderBottom(true).
+		Bold(false)
+	s.Selected = s.Selected.
+		Foreground(lipgloss.Color("229")).
+		Background(lipgloss.Color("57")).
+		Bold(false)
+	t.SetStyles(s)
+
 	t.Help.ShowAll = false
+	t.Focus()
 
 	return summaryModel{
 		// styles: getSummaryStyles(),
 		table: t,
 	}
-}
-
-func getSummaryStyles() lipgloss.Style {
-	return lipgloss.NewStyle().
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(lipgloss.Color("240"))
 }
 
 type summaryModel struct {
@@ -62,7 +67,15 @@ func (this *summaryModel) ClearSummaries() {
 }
 
 func (this summaryModel) Init() tea.Cmd {
-	return nil
+	return tea.Cmd(func() tea.Msg { return this.summaries })
+}
+
+func summaries2Rows(summaries []container.Summary) []table.Row {
+	rows := make([]table.Row, len(summaries))
+	for i := range summaries {
+		rows[i] = summary2Row(summaries[i])
+	}
+	return rows
 }
 
 func summary2Row(summary container.Summary) table.Row {
@@ -81,8 +94,8 @@ func (this summaryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		this.table.SetHeight(msg.Height - 10)
-		this.table.SetWidth(msg.Width - 50)
+		this.table.SetHeight(max(1, msg.Height))
+		this.table.SetWidth(max(1, msg.Width))
 	case tea.BackgroundColorMsg:
 		_ = msg.IsDark()
 	case []container.Summary:
@@ -98,11 +111,27 @@ func (this summaryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return this, cmd
 }
 
+func (this *summaryModel) Focus() {
+	this.table.Focus()
+}
+
+func (this *summaryModel) Blur() {
+	this.table.Blur()
+}
+
 func (this summaryModel) View() tea.View {
-	v := tea.NewView(this.table.View())
-	// v.WindowTitle = "Containers"
+	baseStyle := lipgloss.NewStyle().
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(lipgloss.Color("240"))
+
+	v := tea.NewView(baseStyle.Render(this.table.View()))
+	v.WindowTitle = "Containers"
 
 	return v
+}
+
+func createFakeSummaries() []container.Summary {
+	return []container.Summary{}
 }
 
 // func createContainerTable(pageWidth int, columns []table.Column, rows []table.Row) table.Model {
