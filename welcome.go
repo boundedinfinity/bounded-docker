@@ -12,7 +12,7 @@ type welcomeModel struct {
 
 func newWelcome() welcomeModel {
 	return welcomeModel{
-		textStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("#FF75B7")),
+		textStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("#2a1981")),
 		boxStyle:  lipgloss.NewStyle().Border(lipgloss.NormalBorder()),
 	}
 }

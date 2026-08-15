@@ -28,8 +28,8 @@ func newApp(ctx context.Context, cancel context.CancelFunc) (appModel, error) {
 		current: start,
 		ctx:     ctx,
 		cancel:  cancel,
-		menu:    newMenu(),
 		state:   machine,
+		menu:    newMenu(machine),
 		help:    newHelp(machine),
 		pages: map[string]tea.Model{
 			"root":       newWelcome(),
