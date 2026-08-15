@@ -10,20 +10,15 @@ import (
 func newHelp(state *state.Machine) helpModel {
 	return helpModel{
 		help:        help.New(),
-		inputStyle:  lipgloss.NewStyle().Foreground(lipgloss.Color("#1f2d4b")),
-		widgetStyle: lipgloss.NewStyle().Border(lipgloss.NormalBorder()),
+		borderStyle: lipgloss.NewStyle().Border(lipgloss.NormalBorder()),
 		state:       state,
-		current:     state.Current,
 	}
 }
 
 type helpModel struct {
 	help        help.Model
-	inputStyle  lipgloss.Style
-	widgetStyle lipgloss.Style
-	quitting    bool
+	borderStyle lipgloss.Style
 	state       *state.Machine
-	current     *state.State
 }
 
 func (this helpModel) Init() tea.Cmd {
@@ -34,18 +29,14 @@ func (this helpModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		this.help.SetWidth(msg.Width)
-	case tea.KeyPressMsg:
-		if state, ok := this.state.Next(msg); ok {
-			this.current = state
-		}
 	}
 
 	return this, nil
 }
 
 func (this helpModel) View() tea.View {
-	b := this.current.HelpView()
+	b := this.state.Current.HelpView()
 	v := this.help.ShortHelpView(b)
-	v = this.widgetStyle.Render(v)
+	v = this.borderStyle.Render(v)
 	return tea.NewView(v)
 }
