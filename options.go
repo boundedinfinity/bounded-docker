@@ -1,9 +1,7 @@
 package main
 
-type Focusable interface {
-	Focus()
-	Blur()
-}
+type ClearMsg struct{}
+type RefreshMsg struct{}
 
 // func clamp(value, min, max int) int {
 // 	if value < min {
