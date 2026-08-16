@@ -1,49 +1,19 @@
 package state
 
-type ConfigState struct {
-	Name        string
-	Bindings    []ConfigBinding
-	Description string
+type MachineConfig struct {
+	Start  string        `json:"start"`
+	States []StateConfig `json:"states"`
+	Keys   []KeyConfig   `json:"keys"`
 }
 
-type ConfigBinding struct {
-	Keys []ConfigKey
-	Help string
-	Next string
+type StateConfig struct {
+	Id          string              `json:"id"`
+	Name        string              `json:"name"`
+	Navigations map[string][]string `json:"navigations"`
+	Transitions map[string][]string `json:"transitions"`
 }
 
-type ConfigKey struct {
-	Code string
-	Help string
-}
-
-func Back(name string) ConfigBinding {
-	return ConfigBinding{
-		Help: "go back",
-		Next: name,
-		Keys: []ConfigKey{
-			{Code: "left", Help: "←"},
-			{Code: "h"},
-		},
-	}
-}
-
-func Up() ConfigBinding {
-	return ConfigBinding{
-		Help: "move up",
-		Keys: []ConfigKey{
-			{Code: "up", Help: "↑"},
-			{Code: "k"},
-		},
-	}
-}
-
-func Down() ConfigBinding {
-	return ConfigBinding{
-		Help: "move down",
-		Keys: []ConfigKey{
-			{Code: "down", Help: "↓"},
-			{Code: "j"},
-		},
-	}
+type KeyConfig struct {
+	Code string `json:"code"`
+	Name string `json:"name"`
 }

@@ -1,14 +1,24 @@
 package main
 
 import (
-	"errors"
 	"fmt"
+	"time"
 
 	"charm.land/bubbles/v2/table"
 	tea "charm.land/bubbletea/v2"
+	"github.com/boundedinfinity/docker-tui/tui/widget"
 )
 
-func newErrorModel(errs []error) tea.Model {
+type TimedError struct {
+	err  error
+	time time.Time
+}
+
+func (this TimedError) Error() string {
+	return this.Error()
+}
+
+func newErrorModel(errs []error) (tea.Model, tea.Model) {
 	err2row := func(i int, err error) table.Row {
 		return table.Row{
 			fmt.Sprintf("%d", i),
@@ -21,13 +31,9 @@ func newErrorModel(errs []error) tea.Model {
 		{Title: "Error Text", Width: 120},
 	}
 
-	return newTableModel("Errors", columns, err2row, errs)
+	return widget.Widget("errors", columns, err2row, errs)
 }
 
 func createFakeErrors() []error {
-	return []error{
-		errors.New("Error 1"),
-		errors.New("Error 2"),
-		errors.New("Error 3"),
-	}
+	return []error{}
 }

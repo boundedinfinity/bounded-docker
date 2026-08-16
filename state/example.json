@@ -1,0 +1,140 @@
+{
+    "start": "root",
+    "states": [
+        {
+            "id": "root",
+            "name": "Dashboard",
+            "transitions": {
+                "containers": [
+                    "c"
+                ],
+                "images": [
+                    "i"
+                ],
+                "errors": [
+                    "e"
+                ],
+                "quit": [
+                    "q",
+                    "esc"
+                ]
+            }
+        },
+        {
+            "id": "containers",
+            "name": "Containers",
+            "transitions": {
+                "root": [
+                    "r",
+                    "left",
+                    "h",
+                    "b",
+                    "esc"
+                ],
+                "container-details": [
+                    "d",
+                    "enter"
+                ]
+            },
+            "navigations": {
+                "up": [
+                    "up",
+                    "k"
+                ],
+                "down": [
+                    "down",
+                    "j"
+                ]
+            }
+        },
+        {
+            "id": "container-details",
+            "name": "Details",
+            "transitions": {
+                "root": [
+                    "r"
+                ],
+                "containers": [
+                    "c",
+                    "left",
+                    "h",
+                    "b"
+                ]
+            }
+        },
+        {
+            "id": "images",
+            "name": "Images",
+            "transitions": {
+                "image-details": [
+                    "d",
+                    "enter"
+                ]
+            },
+            "navigations": {
+                "up": [
+                    "up",
+                    "k"
+                ],
+                "down": [
+                    "down",
+                    "j"
+                ]
+            }
+        },
+        {
+            "id": "image-details",
+            "name": "Details",
+            "transitions": {
+                "images": [
+                    "r",
+                    "esc"
+                ],
+                "root": [
+                    "r"
+                ],
+                "quit": [
+                    "q"
+                ]
+            }
+        },
+        {
+            "id": "errors",
+            "name": "Errors",
+            "keys": [
+                "e"
+            ],
+            "transitions": {
+                "root": [
+                    "r",
+                    "esc"
+                ],
+                "quit": [
+                    "q"
+                ]
+            }
+        }
+    ],
+    "keys": [
+        {
+            "code": "left",
+            "name": "←"
+        },
+        {
+            "code": "up",
+            "name": "↑"
+        },
+        {
+            "code": "down",
+            "name": "↓"
+        },
+        {
+            "code": "right",
+            "name": "→"
+        },
+        {
+            "code": "enter",
+            "name": "↵"
+        }
+    ]
+}

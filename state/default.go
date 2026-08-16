@@ -1,42 +1,86 @@
 package state
 
-func DefaultConfig() []ConfigState {
-	return []ConfigState{
-		{
-			Name:        "root",
-			Description: "",
-			Bindings: []ConfigBinding{
-				{Keys: []ConfigKey{{Code: "c"}}, Next: "containers"},
-				{Keys: []ConfigKey{{Code: "i"}}, Next: "images"},
-				{Keys: []ConfigKey{{Code: "e"}}, Next: "errors"},
+func DefaultConfig() MachineConfig {
+	return MachineConfig{
+		Start: "root",
+		States: []StateConfig{
+			{
+				Id:   "quit",
+				Name: "Quit",
+			},
+			{
+				Id:   "root",
+				Name: "Dashboard",
+				Transitions: map[string][]string{
+					"containers": {"c"},
+					"images":     {"i"},
+					"errors":     {"e"},
+					"quit":       {"q", "esc"},
+				},
+			},
+			{
+				Id:   "containers",
+				Name: "Containers",
+				Navigations: map[string][]string{
+					"up":   {"up", "j"},
+					"down": {"down", "k"},
+				},
+				Transitions: map[string][]string{
+					"root":              {"r", "left", "h", "b", "esc"},
+					"container-details": {"d", "enter"},
+					"quit":              {"q"},
+				},
+			},
+			{
+				Id:   "container-details",
+				Name: "Container Details",
+				Transitions: map[string][]string{
+					"root":       {"r"},
+					"containers": {"c", "left", "h", "b", "esc"},
+					"quit":       {"q"},
+				},
+			},
+			{
+				Id:   "images",
+				Name: "Images",
+				Transitions: map[string][]string{
+					"root":          {"r", "left", "h", "b", "esc"},
+					"image-details": {"d", "enter"},
+					"quit":          {"q"},
+				},
+				Navigations: map[string][]string{
+					"up":   {"up", "j"},
+					"down": {"down", "k"},
+				},
+			},
+			{
+				Id:   "image-details",
+				Name: "Image Details",
+				Transitions: map[string][]string{
+					"root":   {"r"},
+					"images": {"i", "left", "h", "b", "esc"},
+					"quit":   {"q"},
+				},
+			},
+			{
+				Id:   "errors",
+				Name: "Errors",
+				Transitions: map[string][]string{
+					"root": {"r", "left", "h", "b", "esc"},
+					"quit": {"q"},
+				},
+				Navigations: map[string][]string{
+					"up":   {"up", "j"},
+					"down": {"down", "k"},
+				},
 			},
 		},
-		{
-			Name:        "containers",
-			Description: "List of containers",
-			Bindings: []ConfigBinding{
-				Back("root"),
-				Up(),
-				Down(),
-			},
-		},
-		{
-			Name:        "images",
-			Description: "List of images",
-			Bindings: []ConfigBinding{
-				Back("root"),
-				Up(),
-				Down(),
-			},
-		},
-		{
-			Name:        "errors",
-			Description: "List of errors",
-			Bindings: []ConfigBinding{
-				Back("root"),
-				Up(),
-				Down(),
-			},
+		Keys: []KeyConfig{
+			{Code: "left", Name: "←"},
+			{Code: "up", Name: "↑"},
+			{Code: "down", Name: "↓"},
+			{Code: "right", Name: "→"},
+			{Code: "enter", Name: "↵"},
 		},
 	}
 }

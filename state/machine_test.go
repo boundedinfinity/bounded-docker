@@ -13,12 +13,19 @@ import (
 // v2.KeyPressMsg {Text: "e", Mod: 0, Code: 101, ShiftedCode: 0, BaseCode: 0, IsRepeat: false}
 // v2.KeyPressMsg {Text: "i", Mod: 0, Code: 105, ShiftedCode: 0, BaseCode: 0, IsRepeat: false}
 
-func Test_StateMachine_Creation(t *testing.T) {
-	machine, err := state.NewMachine("root", state.DefaultConfig())
+func Test_StateMachine_Creation_Default(t *testing.T) {
+	machine, err := state.New(state.DefaultConfig())
+
 	assert.NoError(t, err)
-	assert.Equal(t, "root", machine.Current.Name)
-	msg := tea.KeyPressMsg{Text: "c", Mod: 0, Code: 99, ShiftedCode: 0, BaseCode: 0, IsRepeat: false}
-	state, ok := machine.Next(msg)
+	assert.Equal(t, "root", machine.Current.Id)
+
+	c := tea.KeyPressMsg{Text: "c", Mod: 0, Code: 99, ShiftedCode: 0, BaseCode: 0, IsRepeat: false}
+	next, ok := machine.Next(c)
 	assert.True(t, ok)
-	assert.Equal(t, "containers", state.Name)
+	assert.Equal(t, "containers", next.Id)
+
+	up := tea.KeyPressMsg{Text: "j", Mod: 0, Code: 106, ShiftedCode: 0, BaseCode: 0, IsRepeat: false}
+	next, ok = machine.Next(up)
+	assert.True(t, ok)
+	assert.Equal(t, "containers", next.Id)
 }

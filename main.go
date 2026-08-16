@@ -9,6 +9,7 @@ import (
 
 	"github.com/boundedinfinity/docker-tui/docker"
 	"github.com/boundedinfinity/docker-tui/state"
+	"github.com/boundedinfinity/docker-tui/tui/menu"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -17,25 +18,28 @@ import (
 var _ tea.Model = appModel{}
 
 func newApp(ctx context.Context, cancel context.CancelFunc) (appModel, error) {
-	start := "root"
-	machine, err := state.NewMachine(start, state.DefaultConfig())
+	machine, err := state.New(state.DefaultConfig())
 
 	if err != nil {
 		return appModel{}, err
 	}
 
+	ct, cm := newContainersModel(createFakeContainers())
+	it, im := newImageModel(createFakeImages())
+	et, em := newErrorModel(createFakeErrors())
+
 	m := appModel{
-		current: start,
+		current: "root",
 		ctx:     ctx,
 		cancel:  cancel,
 		state:   machine,
-		menu:    newMenu(machine),
+		menu:    menu.New(machine, cm, im, em),
 		help:    newHelp(machine),
 		pages: map[string]tea.Model{
 			"root":       newWelcome(),
-			"containers": newContainersModel(createFakeContainers()),
-			"images":     newImageModel(createFakeImages()),
-			"errors":     newErrorModel(createFakeErrors()),
+			"containers": ct,
+			"images":     it,
+			"errors":     et,
 		},
 		style: lipgloss.NewStyle().
 			BorderStyle(lipgloss.NormalBorder()).
@@ -89,10 +93,10 @@ func (this appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return this, nil
 		default:
 			if next, ok := this.state.Next(msg); ok {
-				if m, ok := this.pages[next.Name]; ok {
+				if m, ok := this.pages[next.Id]; ok {
 					m := helper(m, tea.FocusMsg{})
-					this.pages[next.Name] = m
-					this.current = next.Name
+					this.pages[next.Id] = m
+					this.current = next.Id
 				}
 			}
 		}
