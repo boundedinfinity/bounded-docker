@@ -1,6 +1,8 @@
 package main
 
 import (
+	"strings"
+
 	"charm.land/bubbles/v2/help"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -35,8 +37,23 @@ func (this helpModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (this helpModel) View() tea.View {
-	b := this.state.Current.HelpView()
-	v := this.help.ShortHelpView(b)
+	var c []string
+
+	if th := this.state.Current.TransisionHelp(); len(th) > 0 {
+		tv := this.help.ShortHelpView(th)
+		c = append(c, tv)
+	}
+
+	if nh := this.state.Current.NavigationHelp(); len(nh) > 0 {
+		nv := this.help.ShortHelpView(nh)
+		c = append(c, nv)
+	}
+
+	v := lipgloss.JoinVertical(lipgloss.Top, strings.Join(c, "\n\n"))
+
+	// b := this.state.Current.HelpView2()
+	// v := this.help.FullHelpView(b)
+
 	v = this.borderStyle.Render(v)
 	return tea.NewView(v)
 }

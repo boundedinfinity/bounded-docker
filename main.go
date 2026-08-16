@@ -66,6 +66,7 @@ func (this appModel) Init() tea.Cmd {
 
 func (this appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
+	broadcast := true
 
 	helper := func(m tea.Model, msg2 tea.Msg) tea.Model {
 		m, cmd := m.Update(msg2)
@@ -97,6 +98,7 @@ func (this appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m := helper(m, tea.FocusMsg{})
 					this.pages[next.Id] = m
 					this.current = next.Id
+					broadcast = false
 				}
 			}
 		}
@@ -105,8 +107,12 @@ func (this appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	this.help = helper(this.help, msg)
 	this.menu = helper(this.menu, msg)
 
-	for i := range this.pages {
-		this.pages[i] = helper(this.pages[i], msg)
+	if broadcast {
+		for i := range this.pages {
+			this.pages[i] = helper(this.pages[i], msg)
+		}
+	} else {
+		this.pages[this.current] = helper(this.pages[this.current], msg)
 	}
 
 	return this, tea.Batch(cmds...)
