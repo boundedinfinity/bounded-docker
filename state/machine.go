@@ -17,16 +17,17 @@ var (
 // /////////////////////////////////////////////////////////////////////////////////////////////////
 
 type Machine struct {
-	Current  *State
-	states   []*State
-	keys     []*Key
-	capture  strings.Builder
-	selected []string
-	models   map[string]tea.Model
+	Current     *State
+	transitions []*State
+	navigation  []*State
+	keys        []*Key
+	capture     strings.Builder
+	selected    []string
+	models      map[string]tea.Model
 }
 
 func (this Machine) FindState(id string) (*State, bool) {
-	for _, state := range this.states {
+	for _, state := range this.transitions {
 		if state.Id == id {
 			return state, true
 		}
@@ -81,69 +82,6 @@ func (this *Machine) Next(msg tea.KeyPressMsg) (*State, bool) {
 
 // /////////////////////////////////////////////////////////////////////////////////////////////////
 
-type State struct {
-	Id          string
-	Name        string
-	Navigations []Navigation
-	Transitions []Transistion
-}
-
-func (this *State) Next(k tea.KeyPressMsg) (*State, bool) {
-	for _, transistion := range this.Transitions {
-		if transistion.Matches(k) {
-			return transistion.State, true
-		}
-	}
-
-	for _, navigation := range this.Navigations {
-		if navigation.Matches(k) {
-			return this, true
-		}
-	}
-
-	return this, false
-}
-
-func (this State) HelpView() []key.Binding {
-	bindings := make([]key.Binding, 0)
-
-	bindings = append(bindings, this.TransisionHelp()...)
-	bindings = append(bindings, this.NavigationHelp()...)
-
-	return bindings
-}
-
-func (this State) HelpView2() [][]key.Binding {
-	bindings := [][]key.Binding{
-		this.TransisionHelp(),
-		this.NavigationHelp(),
-	}
-
-	return bindings
-}
-
-func (this State) TransisionHelp() []key.Binding {
-	bindings := make([]key.Binding, len(this.Transitions))
-
-	for i, transition := range this.Transitions {
-		bindings[i] = transition.bindings
-	}
-
-	return bindings
-}
-
-func (this State) NavigationHelp() []key.Binding {
-	bindings := make([]key.Binding, len(this.Navigations))
-
-	for i, navigation := range this.Navigations {
-		bindings[i] = navigation.bindings
-	}
-
-	return bindings
-}
-
-// /////////////////////////////////////////////////////////////////////////////////////////////////
-
 type Key struct {
 	Code string
 	Name string
@@ -163,9 +101,18 @@ func (this Transistion) Matches(k tea.KeyPressMsg) bool {
 
 // /////////////////////////////////////////////////////////////////////////////////////////////////
 
+type navigationKind int
+
+const (
+	_ navigationKind = iota
+	transision
+	navigation
+)
+
 type Navigation struct {
 	Name     string
 	Keys     []*Key
+	kind     navigationKind
 	bindings key.Binding
 }
 
