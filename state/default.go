@@ -66,8 +66,9 @@ func DefaultConfig() MachineConfig {
 				Id:   "errors",
 				Name: "Errors",
 				Transitions: map[string][]string{
-					"root": {"r", "left", "h", "b", "esc"},
-					"quit": {"q"},
+					"root":   {"r", "left", "h", "b", "esc"},
+					"quit":   {"q"},
+					"errors": {"y"},
 				},
 				Navigations: map[string][]string{
 					"up":   {"up", "j"},

@@ -4,16 +4,20 @@ import (
 	"strings"
 
 	bkey "charm.land/bubbles/v2/key"
+	tea "charm.land/bubbletea/v2"
 )
 
-func New(config MachineConfig) (*Machine, error) {
+func New(config MachineConfig, views map[string]tea.Model) (*Machine, error) {
 	n := func(s string) string {
 		return strings.TrimSpace(s)
 	}
 
 	m := Machine{
-		states: []*State{},
-		keys:   []*Key{},
+		states:   []*State{},
+		keys:     []*Key{},
+		capture:  strings.Builder{},
+		selected: []string{},
+		models:   views,
 	}
 
 	for _, kconfig := range config.Keys {

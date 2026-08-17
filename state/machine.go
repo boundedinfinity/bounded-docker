@@ -1,6 +1,8 @@
 package state
 
 import (
+	"strings"
+
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 	"github.com/boundedinfinity/go-commoner/errorer"
@@ -15,9 +17,12 @@ var (
 // /////////////////////////////////////////////////////////////////////////////////////////////////
 
 type Machine struct {
-	Current *State
-	states  []*State
-	keys    []*Key
+	Current  *State
+	states   []*State
+	keys     []*Key
+	capture  strings.Builder
+	selected []string
+	models   map[string]tea.Model
 }
 
 func (this Machine) FindState(id string) (*State, bool) {
@@ -40,12 +45,33 @@ func (this Machine) FindKey(code string) (*Key, bool) {
 	return nil, false
 }
 
-func (this *Machine) Next(k tea.KeyPressMsg) (*State, bool) {
+func (this *Machine) Broadcast(msg tea.Msg) tea.Cmd {
+	var cmds []tea.Cmd
+
+	for _, model := range this.models {
+		_, cmd := model.Update(msg)
+		cmds = append(cmds, cmd)
+	}
+
+	return tea.Batch(cmds...)
+}
+
+func (this *Machine) Update(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if next, nok := this.Next(msg); nok {
+		if model, vok := this.models[next.Id]; vok {
+			return model.Update(msg)
+		}
+	}
+
+	return this.models[this.Current.Id].Update(msg)
+}
+
+func (this *Machine) Next(msg tea.KeyPressMsg) (*State, bool) {
 	if this.Current == nil {
 		return nil, false
 	}
 
-	next, ok := this.Current.Next(k)
+	next, ok := this.Current.Next(msg)
 	if ok {
 		this.Current = next
 	}

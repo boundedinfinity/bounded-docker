@@ -18,29 +18,29 @@ import (
 var _ tea.Model = appModel{}
 
 func newApp(ctx context.Context, cancel context.CancelFunc) (appModel, error) {
-	machine, err := state.New(state.DefaultConfig())
+
+	cmodel, cmenu := newContainersModel(createFakeContainers())
+	imodel, imenu := newImageModel(createFakeImages())
+	emodel, emenu := newErrorModel(createFakeErrors())
+	views := map[string]tea.Model{
+		"root":       newWelcome(),
+		"containers": cmodel,
+		"images":     imodel,
+		"errors":     emodel,
+	}
+
+	machine, err := state.New(state.DefaultConfig(), views)
 
 	if err != nil {
 		return appModel{}, err
 	}
 
-	ct, cm := newContainersModel(createFakeContainers())
-	it, im := newImageModel(createFakeImages())
-	et, em := newErrorModel(createFakeErrors())
-
 	m := appModel{
-		current: "root",
-		ctx:     ctx,
-		cancel:  cancel,
-		state:   machine,
-		menu:    menu.New(machine, cm, im, em),
-		help:    newHelp(machine),
-		pages: map[string]tea.Model{
-			"root":       newWelcome(),
-			"containers": ct,
-			"images":     it,
-			"errors":     et,
-		},
+		ctx:    ctx,
+		cancel: cancel,
+		state:  machine,
+		menu:   menu.New(machine, cmenu, imenu, emenu),
+		help:   newHelp(machine),
 		style: lipgloss.NewStyle().
 			BorderStyle(lipgloss.NormalBorder()).
 			BorderForeground(lipgloss.Color("240")),
@@ -50,14 +50,13 @@ func newApp(ctx context.Context, cancel context.CancelFunc) (appModel, error) {
 }
 
 type appModel struct {
-	style   lipgloss.Style
-	ctx     context.Context
-	cancel  context.CancelFunc
-	menu    tea.Model
-	help    tea.Model
-	pages   map[string]tea.Model
-	current string
-	state   *state.Machine
+	style  lipgloss.Style
+	ctx    context.Context
+	cancel context.CancelFunc
+	menu   tea.Model
+	help   tea.Model
+	state  *state.Machine
+	view   tea.Model
 }
 
 func (this appModel) Init() tea.Cmd {
@@ -66,7 +65,6 @@ func (this appModel) Init() tea.Cmd {
 
 func (this appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
-	broadcast := true
 
 	helper := func(m tea.Model, msg2 tea.Msg) tea.Model {
 		m, cmd := m.Update(msg2)
@@ -83,38 +81,13 @@ func (this appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		newSize := this.size(msg)
-		for i := range this.pages {
-			this.pages[i] = helper(this.pages[i], newSize)
-		}
-		return this, tea.Batch(cmds...)
+		return this, this.state.Broadcast(newSize)
 	case tea.KeyPressMsg:
-		switch msg.String() {
-		case "q", "ctrl+c":
-			this.cancel()
-			return this, nil
-		default:
-			if next, ok := this.state.Next(msg); ok {
-				if m, ok := this.pages[next.Id]; ok {
-					m := helper(m, tea.FocusMsg{})
-					this.pages[next.Id] = m
-					this.current = next.Id
-					broadcast = false
-				}
-			}
-		}
+		this.view = helper(this.state.Update(msg))
 	}
 
 	this.help = helper(this.help, msg)
 	this.menu = helper(this.menu, msg)
-
-	if broadcast {
-		for i := range this.pages {
-			this.pages[i] = helper(this.pages[i], msg)
-		}
-	} else {
-		this.pages[this.current] = helper(this.pages[this.current], msg)
-	}
-
 	return this, tea.Batch(cmds...)
 }
 
@@ -129,12 +102,10 @@ func (this appModel) size(msg tea.WindowSizeMsg) tea.WindowSizeMsg {
 }
 
 func (this appModel) View() tea.View {
-	current, _ := this.pages[this.current]
-
 	join := lipgloss.JoinVertical(
 		lipgloss.Top,
 		this.menu.View().Content,
-		current.View().Content,
+		this.view.View().Content,
 		this.help.View().Content,
 	)
 

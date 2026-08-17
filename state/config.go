@@ -13,6 +13,10 @@ type StateConfig struct {
 	Transitions map[string][]string `json:"transitions"`
 }
 
+type TransistionConfig interface {
+	map[string][]string | []string
+}
+
 type KeyConfig struct {
 	Code string `json:"code"`
 	Name string `json:"name"`

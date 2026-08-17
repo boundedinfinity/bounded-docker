@@ -14,7 +14,7 @@ import (
 // v2.KeyPressMsg {Text: "i", Mod: 0, Code: 105, ShiftedCode: 0, BaseCode: 0, IsRepeat: false}
 
 func Test_StateMachine_Creation_Default(t *testing.T) {
-	machine, err := state.New(state.DefaultConfig())
+	machine, err := state.New(state.DefaultConfig(), nil)
 
 	assert.NoError(t, err)
 	assert.Equal(t, "root", machine.Current.Id)
