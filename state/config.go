@@ -11,6 +11,7 @@ type StateConfig struct {
 	Name        string              `json:"name"`
 	Navigations map[string][]string `json:"navigations"`
 	Transitions map[string][]string `json:"transitions"`
+	Captures    map[string][]string `json:"captures"`
 }
 
 type TransistionConfig interface {

@@ -57,14 +57,34 @@ func (this *Machine) Broadcast(msg tea.Msg) tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
-func (this *Machine) Update(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	if next, nok := this.Next(msg); nok {
-		if model, vok := this.models[next.Id]; vok {
-			return model.Update(msg)
+func (this Machine) Start() tea.Model {
+	return this.models[this.Current.Id]
+}
+
+func (this *Machine) Update(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
+	if this.Current == nil {
+		return nil, nil, false
+	}
+
+	next, ok := this.Current.Next(msg)
+	if !ok {
+		return nil, nil, false
+	}
+
+	old := this.Current
+	this.Current = next
+
+	if model, ok := this.models[next.Id]; ok {
+		model, cmd := model.Update(msg)
+
+		if old.Id != next.Id {
+			return model, cmd, true
+		} else {
+			return model, cmd, false
 		}
 	}
 
-	return this.models[this.Current.Id].Update(msg)
+	return nil, nil, false
 }
 
 func (this *Machine) Next(msg tea.KeyPressMsg) (*State, bool) {

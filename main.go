@@ -10,6 +10,8 @@ import (
 	"github.com/boundedinfinity/docker-tui/docker"
 	"github.com/boundedinfinity/docker-tui/state"
 	"github.com/boundedinfinity/docker-tui/tui/menu"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/image"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -17,8 +19,7 @@ import (
 
 var _ tea.Model = appModel{}
 
-func newApp(ctx context.Context, cancel context.CancelFunc) (appModel, error) {
-
+func newApp() (appModel, error) {
 	cmodel, cmenu := newContainersModel(createFakeContainers())
 	imodel, imenu := newImageModel(createFakeImages())
 	emodel, emenu := newErrorModel(createFakeErrors())
@@ -36,27 +37,26 @@ func newApp(ctx context.Context, cancel context.CancelFunc) (appModel, error) {
 	}
 
 	m := appModel{
-		ctx:    ctx,
-		cancel: cancel,
-		state:  machine,
-		menu:   menu.New(machine, cmenu, imenu, emenu),
-		help:   newHelp(machine),
+		state: machine,
+		menu:  menu.New(machine, cmenu, imenu, emenu),
+		help:  newHelp(machine),
 		style: lipgloss.NewStyle().
 			BorderStyle(lipgloss.NormalBorder()).
 			BorderForeground(lipgloss.Color("240")),
 	}
 
+	m.view = m.state.Start()
+
 	return m, nil
 }
 
 type appModel struct {
-	style  lipgloss.Style
-	ctx    context.Context
-	cancel context.CancelFunc
-	menu   tea.Model
-	help   tea.Model
-	state  *state.Machine
-	view   tea.Model
+	style lipgloss.Style
+	// cancel context.CancelFunc
+	menu  tea.Model
+	help  tea.Model
+	state *state.Machine
+	view  tea.Model
 }
 
 func (this appModel) Init() tea.Cmd {
@@ -65,29 +65,30 @@ func (this appModel) Init() tea.Cmd {
 
 func (this appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
+	var cmd tea.Cmd
 
-	helper := func(m tea.Model, msg2 tea.Msg) tea.Model {
-		m, cmd := m.Update(msg2)
+	broadcast := func(msg tea.Msg) {
+		this.help, cmd = this.help.Update(msg)
 		cmds = append(cmds, cmd)
-		return m
-	}
-
-	select {
-	case <-this.ctx.Done():
-		return this, tea.Quit
-	default:
+		this.menu, cmd = this.menu.Update(msg)
+		cmds = append(cmds, cmd)
+		cmd = this.state.Broadcast(msg)
+		cmds = append(cmds, cmd)
 	}
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		newSize := this.size(msg)
-		return this, this.state.Broadcast(newSize)
+		broadcast(newSize)
+	case []container.Summary, []image.Summary, error:
+		broadcast(msg)
 	case tea.KeyPressMsg:
-		this.view = helper(this.state.Update(msg))
+		model, cmd, ok := this.state.Update(msg)
+		if ok {
+			return model, cmd
+		}
 	}
 
-	this.help = helper(this.help, msg)
-	this.menu = helper(this.menu, msg)
 	return this, tea.Batch(cmds...)
 }
 
@@ -117,9 +118,12 @@ func (this appModel) View() tea.View {
 }
 
 func main() {
+	var err error
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	wg := &sync.WaitGroup{}
-	sigCh := make(chan os.Signal, 1)
 
 	d, err := docker.NewDocker(wg, ctx)
 	if err != nil {
@@ -127,27 +131,22 @@ func main() {
 		os.Exit(1)
 	}
 
-	signal.Notify(sigCh, os.Interrupt)
-
-	m, err := newApp(ctx, cancel)
+	m, err := newApp()
 	if err != nil {
 		fmt.Println("Error creating app:", err)
 		os.Exit(1)
 	}
 
-	p := tea.NewProgram(m)
+	p := tea.NewProgram(m, tea.WithContext(ctx))
 
 	go func() {
 		<-sigCh
 		cancel()
-		p.Quit()
 	}()
 
 	wg.Go(func() {
-		if _, err := p.Run(); err != nil {
-			fmt.Println("Error running program:", err)
+		if _, err = p.Run(); err != nil {
 			cancel()
-			os.Exit(1)
 		}
 	})
 
@@ -168,4 +167,9 @@ func main() {
 
 	d.Init()
 	wg.Wait()
+
+	if err != nil {
+		fmt.Println("Error:", err)
+		os.Exit(1)
+	}
 }

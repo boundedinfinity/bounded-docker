@@ -152,41 +152,30 @@ func New(config MachineConfig, views map[string]tea.Model) (*Machine, error) {
 	}
 
 	for _, state := range m.transitions {
-		for _, transistion := range state.Transitions {
-			names := make([]string, len(transistion.Keys))
-			codes := make([]string, len(transistion.Keys))
+		mkbindings := func(name string, keys []*Key) bkey.Binding {
+			names := make([]string, len(keys))
+			codes := make([]string, len(keys))
 
-			for k, key := range transistion.Keys {
+			for k, key := range keys {
 				names[k] = key.Name
 				codes[k] = key.Code
 			}
 
 			help := strings.Join(names, "/")
 
-			transistion.bindings = bkey.NewBinding(
+			return bkey.NewBinding(
 				bkey.WithKeys(codes...),
-				bkey.WithHelp(help, transistion.State.Name),
+				bkey.WithHelp(help, name),
 			)
+		}
 
+		for _, transistion := range state.Transitions {
+			transistion.bindings = mkbindings(transistion.State.Name, transistion.Keys)
 			state.Transitions = append(state.Transitions, transistion)
 		}
 
 		for _, navigation := range state.Navigations {
-			names := make([]string, len(navigation.Keys))
-			codes := make([]string, len(navigation.Keys))
-
-			for k, key := range navigation.Keys {
-				names[k] = key.Name
-				codes[k] = key.Code
-			}
-
-			help := strings.Join(names, "/")
-
-			navigation.bindings = bkey.NewBinding(
-				bkey.WithKeys(codes...),
-				bkey.WithHelp(help, navigation.Name),
-			)
-
+			navigation.bindings = mkbindings(navigation.Name, navigation.Keys)
 			state.Navigations = append(state.Navigations, navigation)
 		}
 	}

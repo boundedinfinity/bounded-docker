@@ -6,6 +6,10 @@ list:
 run:
     go run .
 
+run-kill:
+    #!/usr/bin/env fish
+    kill (ps aux | grep -v grep | grep 'go run' | awk '{print $2}')
+
 # https://github.com/charmbracelet/bubbletea#debugging
 debugger:
     #!/usr/bin/env fish
