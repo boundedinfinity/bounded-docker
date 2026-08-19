@@ -2,65 +2,136 @@ package tui
 
 import (
 	"fmt"
+	"strings"
 
-	tea "charm.land/bubbletea/v2"
+	"github.com/boundedinfinity/docker-tui/state"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/image"
+	"github.com/rivo/tview"
 )
 
-func InitialModel() model {
-	return model{
-		choices:  []string{"Buy carrots", "Buy celery", "Buy kohlrabi"},
-		selected: make(map[int]struct{}),
+func NewTui(sm *state.Machine) *tui {
+	tui := &tui{
+		sm:         sm,
+		containers: createInfo("Containers", containerTitles(), container2Row),
+		images:     createInfo("Images", imageTitles(), image2Row),
+		errors:     createInfo("Errors", errorTitles(), error2Row),
+	}
+
+	layout := tview.NewFlex().SetDirection(tview.FlexRow).
+		AddItem(tui.mkMenu(), 0, 1, false).
+		AddItem(tui.containers.data, 0, 5, false).
+		AddItem(tui.mkNavigation(), 0, 1, false)
+
+	tui.app = tview.NewApplication().SetRoot(layout, true).EnableMouse(true)
+
+	tui.containers.Update(createFakeContainers())
+	tui.images.Update(createFakeImages())
+	tui.errors.Update(createFakeErrors())
+
+	return tui
+}
+
+type tui struct {
+	app        *tview.Application
+	middle     *tview.Box
+	containers *Info[container.Summary]
+	images     *Info[image.Summary]
+	errors     *Info[error]
+	sm         *state.Machine
+	help       *tview.Flex
+}
+
+func (t *tui) Run() error {
+	return t.app.Run()
+}
+
+func (this *tui) mkNavigation() tview.Primitive {
+	this.help = tview.NewFlex().SetDirection(tview.FlexColumn)
+	this.help.SetBorder(true).SetTitle(" [ Navigation ]")
+	this.updateNavigation()
+
+	return this.help
+}
+
+func (this *tui) updateNavigation() {
+	this.help.Clear()
+	var keys []string
+
+	for _, navigation := range this.sm.Current.Navigations {
+		for _, key := range navigation.Keys {
+			keys = append(keys, key.Name)
+		}
+
+		text := fmt.Sprintf("%s -> %s", strings.Join(keys, "/"), navigation.Name)
+		view := tview.NewTextView().SetText(text)
+		this.help.AddItem(view, 0, 1, false)
 	}
 }
 
-type model struct {
-	choices  []string
-	cursor   int
-	selected map[int]struct{}
+func (this *tui) mkMenu() tview.Primitive {
+	menu := tview.NewFlex().
+		SetDirection(tview.FlexColumn).
+		AddItem(tview.NewTextView(), 0, 1, false).
+		AddItem(this.containers.header, 0, 1, false).
+		AddItem(this.images.header, 0, 1, false).
+		AddItem(this.errors.header, 0, 1, false).
+		AddItem(tview.NewTextView(), 0, 1, false)
+	menu.
+		SetBorder(true).
+		SetTitle(" [ Bounded Docker ] ")
+
+	return menu
 }
 
-func (m model) Init() tea.Cmd {
-	return nil
+// /////////////////////////////////////////////////////////////////////////////////////////////////
+
+func createInfo[T any](title string, headers []string, fn func(i int, item T) []string) *Info[T] {
+	info := &Info[T]{
+		Title:        title,
+		Items:        []T{},
+		headers:      headers,
+		item2RowFunc: fn,
+	}
+
+	info.header = tview.NewTextView()
+
+	info.data = tview.NewTable().
+		SetBorders(true).
+		SetFixed(1, len(headers)).
+		SetEvaluateAllRows(true)
+
+	info.Update(nil)
+	return info
 }
 
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.String() {
-		case "ctrl+c", "q":
-			return m, tea.Quit
-		case "up", "k":
-			if m.cursor > 0 {
-				m.cursor--
-			}
-		case "down", "j":
-			if m.cursor < len(m.choices)-1 {
-				m.cursor++
-			}
-		case "enter", " ":
-			if _, ok := m.selected[m.cursor]; ok {
-				delete(m.selected, m.cursor)
-			} else {
-				m.selected[m.cursor] = struct{}{}
-			}
+type Info[T any] struct {
+	Title        string
+	Items        []T
+	headers      []string
+	header       *tview.TextView
+	data         *tview.Table
+	item2RowFunc func(int, T) []string
+	colWidth     int
+}
+
+func (this *Info[T]) Update(items []T) {
+	this.Items = items
+	count := len(this.Items)
+
+	this.header.Clear()
+	fmt.Fprintf(this.header, "%s [%d]", this.Title, count)
+
+	this.data.Clear()
+	data := [][]string{this.headers}
+	for i, item := range this.Items {
+		data = append(data, this.item2RowFunc(i, item))
+	}
+
+	for row, vals := range data {
+		for col, val := range vals {
+			cell := tview.NewTableCell(val)
+			this.data.SetCell(row, col, cell)
 		}
 	}
-	return m, nil
-}
-
-func (m model) View() tea.View {
-	s := "What should we buy at the market?\n\n"
-	for i, choice := range m.choices {
-		cursor := " "
-		if m.cursor == i {
-			cursor = ">"
-		}
-		checked := " "
-		if _, ok := m.selected[i]; ok {
-			checked = "x"
-		}
-		s += fmt.Sprintf("%s [%s] %s\n", cursor, checked, choice)
-	}
-	s += "\nPress q to quit.\n"
-	return tea.NewView(s)
 }

@@ -3,18 +3,14 @@ package state
 import (
 	"fmt"
 	"strings"
-
-	bkey "charm.land/bubbles/v2/key"
-	tea "charm.land/bubbletea/v2"
 )
 
-func New(config MachineConfig, views map[string]tea.Model) (*Machine, error) {
+func New(config MachineConfig) (*Machine, error) {
 	m := Machine{
 		transitions: []*State{},
 		keys:        []*Key{},
 		capture:     strings.Builder{},
 		selected:    []string{},
-		models:      views,
 	}
 
 	// process predefined keys
@@ -151,34 +147,34 @@ func New(config MachineConfig, views map[string]tea.Model) (*Machine, error) {
 		}
 	}
 
-	for _, state := range m.transitions {
-		mkbindings := func(name string, keys []*Key) bkey.Binding {
-			names := make([]string, len(keys))
-			codes := make([]string, len(keys))
+	// for _, state := range m.transitions {
+	// 	mkbindings := func(name string, keys []*Key) bkey.Binding {
+	// 		names := make([]string, len(keys))
+	// 		codes := make([]string, len(keys))
 
-			for k, key := range keys {
-				names[k] = key.Name
-				codes[k] = key.Code
-			}
+	// 		for k, key := range keys {
+	// 			names[k] = key.Name
+	// 			codes[k] = key.Code
+	// 		}
 
-			help := strings.Join(names, "/")
+	// 		help := strings.Join(names, "/")
 
-			return bkey.NewBinding(
-				bkey.WithKeys(codes...),
-				bkey.WithHelp(help, name),
-			)
-		}
+	// 		return bkey.NewBinding(
+	// 			bkey.WithKeys(codes...),
+	// 			bkey.WithHelp(help, name),
+	// 		)
+	// 	}
 
-		for _, transistion := range state.Transitions {
-			transistion.bindings = mkbindings(transistion.State.Name, transistion.Keys)
-			state.Transitions = append(state.Transitions, transistion)
-		}
+	// 	for _, transistion := range state.Transitions {
+	// 		transistion.bindings = mkbindings(transistion.State.Name, transistion.Keys)
+	// 		state.Transitions = append(state.Transitions, transistion)
+	// 	}
 
-		for _, navigation := range state.Navigations {
-			navigation.bindings = mkbindings(navigation.Name, navigation.Keys)
-			state.Navigations = append(state.Navigations, navigation)
-		}
-	}
+	// 	for _, navigation := range state.Navigations {
+	// 		navigation.bindings = mkbindings(navigation.Name, navigation.Keys)
+	// 		state.Navigations = append(state.Navigations, navigation)
+	// 	}
+	// }
 
 	if start, ok := m.FindState(config.Start); !ok {
 		return nil, errFn("start state '%s' does not exist", config.Start)

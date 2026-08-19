@@ -3,8 +3,6 @@ package state
 import (
 	"strings"
 
-	"charm.land/bubbles/v2/key"
-	tea "charm.land/bubbletea/v2"
 	"github.com/boundedinfinity/go-commoner/errorer"
 )
 
@@ -23,7 +21,6 @@ type Machine struct {
 	keys        []*Key
 	capture     strings.Builder
 	selected    []string
-	models      map[string]tea.Model
 }
 
 func (this Machine) FindState(id string) (*State, bool) {
@@ -46,53 +43,16 @@ func (this Machine) FindKey(code string) (*Key, bool) {
 	return nil, false
 }
 
-func (this *Machine) Broadcast(msg tea.Msg) tea.Cmd {
-	var cmds []tea.Cmd
-
-	for _, model := range this.models {
-		_, cmd := model.Update(msg)
-		cmds = append(cmds, cmd)
-	}
-
-	return tea.Batch(cmds...)
+func (this Machine) Start() *State {
+	return this.Current
 }
 
-func (this Machine) Start() tea.Model {
-	return this.models[this.Current.Id]
-}
-
-func (this *Machine) Update(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
-	if this.Current == nil {
-		return nil, nil, false
-	}
-
-	next, ok := this.Current.Next(msg)
-	if !ok {
-		return nil, nil, false
-	}
-
-	old := this.Current
-	this.Current = next
-
-	if model, ok := this.models[next.Id]; ok {
-		model, cmd := model.Update(msg)
-
-		if old.Id != next.Id {
-			return model, cmd, true
-		} else {
-			return model, cmd, false
-		}
-	}
-
-	return nil, nil, false
-}
-
-func (this *Machine) Next(msg tea.KeyPressMsg) (*State, bool) {
+func (this *Machine) Next(code string) (*State, bool) {
 	if this.Current == nil {
 		return nil, false
 	}
 
-	next, ok := this.Current.Next(msg)
+	next, ok := this.Current.Next(code)
 	if ok {
 		this.Current = next
 	}
@@ -107,16 +67,24 @@ type Key struct {
 	Name string
 }
 
+func (this Key) Matches(code string) bool {
+	return this.Code == code
+}
+
 // /////////////////////////////////////////////////////////////////////////////////////////////////
 
 type Transistion struct {
-	State    *State
-	Keys     []*Key
-	bindings key.Binding
+	State *State
+	Keys  []*Key
 }
 
-func (this Transistion) Matches(k tea.KeyPressMsg) bool {
-	return key.Matches(k, this.bindings)
+func (this Transistion) Matches(code string) bool {
+	for _, key := range this.Keys {
+		if key.Matches(code) {
+			return true
+		}
+	}
+	return false
 }
 
 // /////////////////////////////////////////////////////////////////////////////////////////////////
@@ -130,12 +98,17 @@ const (
 )
 
 type Navigation struct {
-	Name     string
-	Keys     []*Key
-	kind     navigationKind
-	bindings key.Binding
+	Name string
+	Keys []*Key
+	kind navigationKind
 }
 
-func (this Navigation) Matches(k tea.KeyPressMsg) bool {
-	return key.Matches(k, this.bindings)
+func (this Navigation) Matches(code string) bool {
+	for _, key := range this.Keys {
+		if key.Matches(code) {
+			return true
+		}
+	}
+
+	return false
 }
