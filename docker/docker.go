@@ -6,6 +6,7 @@ import (
 
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/image"
+	"github.com/moby/moby/api/types/network"
 	"github.com/moby/moby/client"
 	moby "github.com/moby/moby/client"
 )
@@ -28,20 +29,25 @@ func NewDocker(wg *sync.WaitGroup, ctx context.Context) (*dockerSystem, error) {
 		ErrCh:        make(chan error),
 		ContainersCh: make(chan []container.Summary),
 		ImagesCh:     make(chan []image.Summary),
-
-		wg:  wg,
-		api: api,
-		ctx: ctx,
+		NetworksCh:   make(chan []network.Summary),
+		wg:           wg,
+		api:          api,
+		ctx:          ctx,
 	}, nil
 }
 
 type dockerSystem struct {
 	ContainersCh chan []container.Summary
 	ImagesCh     chan []image.Summary
+	NetworksCh   chan []network.Summary
 	ErrCh        chan error
 	wg           *sync.WaitGroup
 	api          *client.Client
 	ctx          context.Context
+}
+
+func (this *dockerSystem) findDocker() error {
+	return nil
 }
 
 func (this *dockerSystem) Init() {
@@ -56,19 +62,22 @@ func (this *dockerSystem) Init() {
 			case event := <-result.Messages:
 				switch event.Type {
 				case "container":
-					this.ListSummaries()
+					this.ListContainers()
 				case "image":
 					this.ListImages()
+				case "network":
+					this.ListNetworks()
 				}
 			}
 		}
 	})
 
-	this.ListSummaries()
+	this.ListContainers()
 	this.ListImages()
+	this.ListNetworks()
 }
 
-func (this *dockerSystem) ListSummaries() {
+func (this *dockerSystem) ListContainers() {
 	this.wg.Go(func() {
 		o := client.ContainerListOptions{
 			All: true,
@@ -88,6 +97,17 @@ func (this *dockerSystem) ListImages() {
 		}
 		if result, err := this.api.ImageList(this.ctx, o); err == nil {
 			go func() { this.ImagesCh <- result.Items }()
+		} else {
+			go func() { this.ErrCh <- err }()
+		}
+	})
+}
+
+func (this *dockerSystem) ListNetworks() {
+	this.wg.Go(func() {
+		o := client.NetworkListOptions{}
+		if result, err := this.api.NetworkList(this.ctx, o); err == nil {
+			go func() { this.NetworksCh <- result.Items }()
 		} else {
 			go func() { this.ErrCh <- err }()
 		}

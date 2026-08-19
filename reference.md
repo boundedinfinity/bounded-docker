@@ -8,20 +8,21 @@ Reference application:
     - [go-sdk](https://github.com/docker/go-sdk) for Docker
     - [Moby Project](https://pkg.go.dev/github.com/docker/docker@v28.5.2+incompatible)
     - https://charm.land/
-    - [bubbletea](https://github.com/charmbracelet/bubbletea/tree/v2.0.8)
-        - [docs](https://pkg.go.dev/github.com/charmbracelet/bubbletea/v2)
-        - [bubbles](https://github.com/charmbracelet/bubbles/tree/v2.1.1)
-        - [libgloss - styles](https://github.com/charmbracelet/lipgloss/tree/v2.0.6)
-        - [lipgloss - docs](https://pkg.go.dev/charm.land/lipgloss/v2)
-        - [table example](https://github.com/charmbracelet/bubbletea/tree/v2.0.8/examples/table)
-        - [table-resize example](https://github.com/charmbracelet/bubbletea/blob/main/examples/table-resize/main.go)
-        - [list-default example](https://github.com/charmbracelet/bubbletea/blob/main/examples/list-default/main.go)
-        - [help example](https://github.com/charmbracelet/bubbletea/blob/main/examples/help/main.go)
-    - ~~[tview](https://github.com/rivo/tview)~~
-        - ~~[tview Wiki](https://github.com/rivo/tview/wiki)~~
-        - ~~[Table](https://github.com/rivo/tview/wiki/Table)~~
-        - ~~[TextArea](https://github.com/rivo/tview/wiki/TextArea)~~
-        - ~~[Concurrency]https://github.com/rivo/tview/wiki/Concurrency~~
+    - ~~[bubbletea](https://github.com/charmbracelet/bubbletea/tree/v2.0.8)~~
+        - ~~[docs](https://pkg.go.dev/github.com/charmbracelet/bubbletea/v2)~~
+        - ~~[bubbles](https://github.com/charmbracelet/bubbles/tree/v2.1.1)~~
+        - ~~[libgloss - styles](https://github.com/charmbracelet/lipgloss/tree/v2.0.6)~~
+        - ~~[lipgloss - docs](https://pkg.go.dev/charm.land/lipgloss/v2)~~
+        - ~~[table example](https://github.com/charmbracelet/bubbletea/tree/v2.0.8/examples/table)~~
+        - ~~[table-resize example](https://github.com/charmbracelet/bubbletea/blob/main/examples/table-resize/main.go)~~
+        - ~~[list-default example](https://github.com/charmbracelet/bubbletea/blob/main/examples/list-default/main.go)~~
+        - ~~[help example](https://github.com/charmbracelet/bubbletea/blob/main/examples/help/main.go)~~
+    - [tview](https://github.com/rivo/tview)
+        - [tview Wiki](https://github.com/rivo/tview/wiki)
+            - [Concurrency](https://github.com/rivo/tview/wiki/Concurrency)
+            - [CustomKeys](https://github.com/rivo/tview/wiki/CustomKeys)
+        - [Table](https://github.com/rivo/tview/wiki/Table)
+        - [TextArea](https://github.com/rivo/tview/wiki/TextArea)
     - [Cobra](https://cobra.dev/) CLI framework
         - https://github.com/spf13/cobra
     - Wails

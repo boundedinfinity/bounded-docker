@@ -4,6 +4,7 @@ list:
     just --list
 
 run:
+    go mod tidy
     go run .
 
 run-kill:
@@ -13,6 +14,7 @@ run-kill:
 # https://github.com/charmbracelet/bubbletea#debugging
 debugger:
     #!/usr/bin/env fish
+    go mod tidy
     dlv debug --listen=:2345 --headless --api-version=2 .
 
 debugger-kill:

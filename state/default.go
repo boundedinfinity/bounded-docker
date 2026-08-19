@@ -14,6 +14,7 @@ func DefaultConfig() MachineConfig {
 				Transitions: map[string][]string{
 					"containers": {"c"},
 					"images":     {"i"},
+					"networks":   {"n"},
 					"errors":     {"e"},
 					"quit":       {"q", "esc"},
 				},
@@ -60,6 +61,28 @@ func DefaultConfig() MachineConfig {
 					"root":   {"r"},
 					"images": {"i", "left", "h", "b", "esc"},
 					"quit":   {"q"},
+				},
+			},
+			{
+				Id:   "networks",
+				Name: "Networks",
+				Transitions: map[string][]string{
+					"root":            {"r", "left", "h", "b", "esc"},
+					"network-details": {"d", "enter"},
+					"quit":            {"q"},
+				},
+				Navigations: map[string][]string{
+					"up":   {"up", "j"},
+					"down": {"down", "k"},
+				},
+			},
+			{
+				Id:   "network-details",
+				Name: "Network Details",
+				Transitions: map[string][]string{
+					"root":     {"r"},
+					"networks": {"n", "left", "h", "b", "esc"},
+					"quit":     {"q"},
 				},
 			},
 			{
