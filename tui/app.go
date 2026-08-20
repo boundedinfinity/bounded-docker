@@ -3,7 +3,6 @@ package tui
 import (
 	"context"
 	"fmt"
-	"strings"
 	"sync"
 
 	"github.com/boundedinfinity/docker-tui/docker"
@@ -26,7 +25,8 @@ type tui struct {
 	networks    Info
 	errors      Info
 	sm          *state.Machine
-	help        *tview.Flex
+	menu        *tview.Flex
+	nav         *tview.Pages
 	pages       *tview.Pages
 	screenWidth int
 	logsCh      chan moby.ContainerLogsResult
@@ -95,27 +95,10 @@ func (this *tui) handleInput(event *tcell.EventKey) *tcell.EventKey {
 		}
 
 		this.pages.SwitchToPage(state.Id)
-		this.updateNavigation()
+		this.nav.SwitchToPage(state.Id)
 
 		return nil
 	}
 
 	return event
-}
-
-func (this *tui) updateNavigation() {
-	this.help.Clear()
-
-	this.help.AddItem(tview.NewTextView(), 0, 1, false)
-	for _, navigation := range this.sm.Current.Transitions {
-		var keys []string
-		for _, key := range navigation.Keys {
-			keys = append(keys, key.Name)
-		}
-
-		text := fmt.Sprintf("%s -> %s", strings.Join(keys, "/"), navigation.State.Name)
-		view := tview.NewTextView().SetText(text)
-		this.help.AddItem(view, 0, 1, false)
-	}
-	this.help.AddItem(tview.NewTextView(), 0, 1, false)
 }

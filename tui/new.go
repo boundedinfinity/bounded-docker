@@ -40,12 +40,13 @@ func New(wg *sync.WaitGroup, ctx context.Context, cancel context.CancelFunc, sm 
 		AddPage("errors", tui.errors.Data(), true, false).
 		SwitchToPage(tui.sm.Start().Id)
 
-	menu := tui.newMenu([]Info{tui.containers, tui.images, tui.networks, tui.errors})
+	tui.menu = tui.newMenu([]Info{tui.containers, tui.images, tui.networks, tui.errors})
+	tui.nav = tui.newNavigation()
 
 	layout := tview.NewFlex().SetDirection(tview.FlexRow).
-		AddItem(menu, 0, 1, false).
+		AddItem(tui.menu, 0, 1, false).
 		AddItem(tui.pages, 0, 5, false).
-		AddItem(tui.newNavigation(), 0, 1, false)
+		AddItem(tui.nav, 0, 1, false)
 
 	tui.app.SetRoot(layout, true).EnableMouse(true)
 	tui.app.SetInputCapture(tui.handleInput)
@@ -54,18 +55,24 @@ func New(wg *sync.WaitGroup, ctx context.Context, cancel context.CancelFunc, sm 
 	return tui
 }
 
-func (this *tui) newNavigation() tview.Primitive {
-	this.help = tview.NewFlex().SetDirection(tview.FlexColumn)
-	this.help.SetBorder(true).SetTitle(" [ Navigation ]")
-	this.updateNavigation()
+func (this *tui) newNavigation() *tview.Pages {
+	pages := tview.NewPages()
+	pages.SetBorder(true).SetTitle(" [ Navigation ]")
 
-	return this.help
+	for _, state := range this.sm.States() {
+		pages.AddPage(state.Id, Utils.state2Table(state), true, false)
+	}
+
+	pages.SwitchToPage(this.sm.Current.Id)
+
+	return pages
 }
 
-func (this *tui) newMenu(items []Info) tview.Primitive {
+func (this *tui) newMenu(items []Info) *tview.Flex {
 	menu := tview.NewFlex().
 		SetDirection(tview.FlexColumn).
 		AddItem(tview.NewTextView(), 0, 1, false)
+	menu.SetBorder(true).SetTitle(" [ Bounded Docker ] ")
 
 	for _, info := range items {
 		menu.AddItem(info.Header(), 0, 1, false)

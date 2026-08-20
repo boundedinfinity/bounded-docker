@@ -1,8 +1,6 @@
 package state
 
 import (
-	"strings"
-
 	"github.com/boundedinfinity/go-commoner/errorer"
 )
 
@@ -15,16 +13,13 @@ var (
 // /////////////////////////////////////////////////////////////////////////////////////////////////
 
 type Machine struct {
-	Current     *State
-	transitions []*State
-	navigation  []*State
-	keys        []*Key
-	capture     strings.Builder
-	selected    []string
+	Current *State
+	states  []*State
+	keys    []*Key
 }
 
 func (this Machine) FindState(id string) (*State, bool) {
-	for _, state := range this.transitions {
+	for _, state := range this.states {
 		if state.Id == id {
 			return state, true
 		}
@@ -41,6 +36,10 @@ func (this Machine) FindKey(code string) (*Key, bool) {
 	}
 
 	return nil, false
+}
+
+func (this Machine) States() []*State {
+	return this.states
 }
 
 func (this Machine) Start() *State {

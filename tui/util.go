@@ -5,9 +5,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/boundedinfinity/docker-tui/state"
 	"github.com/flosch/go-humanize"
 	"github.com/gdamore/tcell/v2"
 	"github.com/moby/moby/api/types/container"
+	"github.com/rivo/tview"
 )
 
 // /////////////////////////////////////////////////////////////////////////////////////////////////
@@ -77,6 +79,54 @@ func (_ utils) tcellEvent2Str(event *tcell.EventKey) string {
 	key = strings.ToLower(key)
 
 	return key
+}
+
+func (_ utils) state2Rows(state *state.State) [][]string {
+	rows := [][]string{}
+	row := []string{}
+
+	for _, transistion := range state.Transitions {
+		var keys []string
+		for _, key := range transistion.Keys {
+			keys = append(keys, key.Name)
+		}
+
+		text := fmt.Sprintf("%s -> %s", strings.Join(keys, "/"), transistion.State.Name)
+		row = append(row, text)
+	}
+
+	rows = append(rows, row)
+	row = []string{}
+
+	for _, command := range state.Commands {
+		var keys []string
+		for _, key := range command.Keys {
+			keys = append(keys, key.Name)
+		}
+
+		text := fmt.Sprintf("%s -> %s", strings.Join(keys, "/"), command.Name)
+		row = append(row, text)
+	}
+
+	rows = append(rows, row)
+	return rows
+}
+
+func (_ utils) state2Table(state *state.State) *tview.Table {
+	rows := Utils.state2Rows(state)
+	table := tview.NewTable()
+
+	for r, row := range rows {
+		for c, text := range row {
+			cell := tview.NewTableCell(text).
+				SetTextColor(tcell.ColorWhite).
+				SetAlign(tview.AlignCenter).
+				SetSelectable(false)
+			table.SetCell(r, c, cell)
+		}
+	}
+
+	return table
 }
 
 // /////////////////////////////////////////////////////////////////////////////////////////////////

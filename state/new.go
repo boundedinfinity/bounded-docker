@@ -7,10 +7,8 @@ import (
 
 func New(config MachineConfig) (*Machine, error) {
 	m := Machine{
-		transitions: []*State{},
-		keys:        []*Key{},
-		capture:     strings.Builder{},
-		selected:    []string{},
+		states: []*State{},
+		keys:   []*Key{},
 	}
 
 	// process predefined keys
@@ -44,7 +42,7 @@ func New(config MachineConfig) (*Machine, error) {
 		}
 
 		process(sconfig.Transitions)
-		process(sconfig.Navigations)
+		process(sconfig.Commands)
 	}
 
 	for i, sconfig := range config.States {
@@ -59,7 +57,7 @@ func New(config MachineConfig) (*Machine, error) {
 			Transitions: []Transistion{},
 		}
 
-		m.transitions = append(m.transitions, state)
+		m.states = append(m.states, state)
 	}
 
 	for s, sconfig := range config.States {
@@ -96,7 +94,7 @@ func New(config MachineConfig) (*Machine, error) {
 			return nil
 		}
 
-		for tid, ckeys := range sconfig.Transitions {
+		for tid, keyConfigs := range sconfig.Transitions {
 			tid = norm(tid)
 			tstate, tok := m.FindState(tid)
 
@@ -106,12 +104,12 @@ func New(config MachineConfig) (*Machine, error) {
 
 			transision := Transistion{State: tstate}
 
-			for k, ckey := range ckeys {
-				ckey = norm(ckey)
-				key, kok := m.FindKey(ckey)
+			for k, keyConfig := range keyConfigs {
+				keyConfig = norm(keyConfig)
+				key, kok := m.FindKey(keyConfig)
 
 				if !kok {
-					return nil, errFn("state[%d:%s].transitions[%s].key[%d:%s]: not found", s, sid, tid, k, ckey)
+					return nil, errFn("state[%d:%s].transitions[%s].key[%d:%s]: not found", s, sid, tid, k, keyConfig)
 				}
 
 				transision.Keys = append(transision.Keys, key)
@@ -124,26 +122,26 @@ func New(config MachineConfig) (*Machine, error) {
 			state.Transitions = append(state.Transitions, transision)
 		}
 
-		for name, nkeys := range sconfig.Navigations {
+		for name, keyConfigs := range sconfig.Commands {
 			name = norm(name)
-			navigation := Navigation{Name: name, Keys: []*Key{}}
+			command := Command{Name: name, Keys: []*Key{}}
 
-			for k, nkey := range nkeys {
-				nkey = norm(nkey)
-				key, kok := m.FindKey(nkey)
+			for k, keyConfig := range keyConfigs {
+				keyConfig = norm(keyConfig)
+				key, kok := m.FindKey(keyConfig)
 
 				if !kok {
-					return nil, errFn("state[%d:%s].navigation[%s].key[%d:%s]: not found", s, sid, name, k, nkey)
+					return nil, errFn("state[%d:%s].commands[%s].key[%d:%s]: not found", s, sid, name, k, keyConfig)
 				}
 
-				navigation.Keys = append(navigation.Keys, key)
+				command.Keys = append(command.Keys, key)
 			}
 
-			if err := checkDups(navigation.Keys); err != nil {
+			if err := checkDups(command.Keys); err != nil {
 				return nil, err
 			}
 
-			state.Navigations = append(state.Navigations, navigation)
+			state.Commands = append(state.Commands, command)
 		}
 	}
 

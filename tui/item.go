@@ -88,8 +88,8 @@ func (this *info[T]) Focus() {
 func (this *info[T]) update(items []T) {
 	this.Items = items
 	count := len(this.Items)
-
 	data := [][]string{this.headers}
+
 	for i, item := range this.Items {
 		data = append(data, this.item2RowFunc(i, item))
 	}

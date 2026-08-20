@@ -22,7 +22,7 @@ func DefaultConfig() MachineConfig {
 			{
 				Id:   "containers",
 				Name: "Containers",
-				Navigations: map[string][]string{
+				Commands: map[string][]string{
 					"up":   {"up", "j"},
 					"down": {"down", "k"},
 				},
@@ -49,7 +49,7 @@ func DefaultConfig() MachineConfig {
 					"image-details": {"d", "enter"},
 					"quit":          {"q"},
 				},
-				Navigations: map[string][]string{
+				Commands: map[string][]string{
 					"up":   {"up", "j"},
 					"down": {"down", "k"},
 				},
@@ -71,7 +71,7 @@ func DefaultConfig() MachineConfig {
 					"network-details": {"d", "enter"},
 					"quit":            {"q"},
 				},
-				Navigations: map[string][]string{
+				Commands: map[string][]string{
 					"up":   {"up", "j"},
 					"down": {"down", "k"},
 				},
@@ -93,7 +93,7 @@ func DefaultConfig() MachineConfig {
 					"quit":   {"q"},
 					"errors": {"y"},
 				},
-				Navigations: map[string][]string{
+				Commands: map[string][]string{
 					"up":   {"up", "j"},
 					"down": {"down", "k"},
 				},

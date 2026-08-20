@@ -9,9 +9,8 @@ type MachineConfig struct {
 type StateConfig struct {
 	Id          string              `json:"id"`
 	Name        string              `json:"name"`
-	Navigations map[string][]string `json:"navigations"`
+	Commands    map[string][]string `json:"commands"`
 	Transitions map[string][]string `json:"transitions"`
-	Captures    map[string][]string `json:"captures"`
 }
 
 type TransistionConfig interface {
