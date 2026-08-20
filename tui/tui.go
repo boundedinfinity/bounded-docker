@@ -25,6 +25,7 @@ type tui struct {
 	networks    Info
 	errors      Info
 	sm          *state.Machine
+	status      *tview.TextView
 	menu        *tview.Flex
 	nav         *tview.Pages
 	pages       *tview.Pages
@@ -77,25 +78,38 @@ func (this *tui) handleRedraw(screen tcell.Screen) bool {
 }
 
 func (this *tui) handleInput(event *tcell.EventKey) *tcell.EventKey {
-	key := Utils.tcellEvent2Str(event)
+	key := Utils.Tview.tcellEvent2Str(event)
 
-	if state, ok := this.sm.Next(key); ok {
+	if state, cmd, ok := this.sm.Next(key); ok {
+		this.pages.SwitchToPage(state.Id)
+		this.nav.SwitchToPage(state.Id)
+
 		switch state.Id {
 		case "quit":
 			this.cancel()
 			return nil
 		case "containers":
-			this.containers.Focus()
+			this.app.SetFocus(this.containers.Data())
 		case "images":
-			this.images.Focus()
+			this.app.SetFocus(this.images.Data())
 		case "errors":
-			this.errors.Focus()
-		default:
-			this.app.SetFocus(this.root)
+			this.app.SetFocus(this.errors.Data())
+		case "networks":
+			this.app.SetFocus(this.networks.Data())
+		case "container-details":
+			if id, ok := this.containers.Id(); ok {
+				this.setStatus("Container: %s", id)
+			} else {
+				fmt.Println("Container: <none>")
+			}
 		}
 
-		this.pages.SwitchToPage(state.Id)
-		this.nav.SwitchToPage(state.Id)
+		if cmd != nil {
+			switch cmd.Name {
+			case "up", "down":
+				return event
+			}
+		}
 
 		return nil
 	}

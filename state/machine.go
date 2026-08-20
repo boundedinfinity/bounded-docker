@@ -46,15 +46,15 @@ func (this Machine) Start() *State {
 	return this.Current
 }
 
-func (this *Machine) Next(code string) (*State, bool) {
+func (this *Machine) Next(code string) (*State, *Command, bool) {
 	if this.Current == nil {
-		return nil, false
+		return nil, nil, false
 	}
 
-	next, ok := this.Current.Next(code)
+	next, cmd, ok := this.Current.Next(code)
 	if ok {
 		this.Current = next
 	}
 
-	return next, ok
+	return next, cmd, ok
 }

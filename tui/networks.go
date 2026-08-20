@@ -4,17 +4,23 @@ import (
 	"github.com/moby/moby/api/types/network"
 )
 
-func networkTitles() []string {
+type networkUtils struct{}
+
+func (_ networkUtils) networkTitles() []string {
 	return []string{"#", "ID", "Name", "Driver", "Scope", "Labels"}
 }
 
-func network2Row(i int, summary network.Summary) []string {
+func (_ networkUtils) id(summary network.Summary) string {
+	return summary.ID
+}
+
+func (_ networkUtils) network2Row(i int, summary network.Summary) []string {
 	return []string{
 		Utils.index2Str(i),
 		summary.ID,
 		summary.Name,
 		summary.Driver,
 		summary.Scope,
-		Utils.labels2Str(summary.Labels),
+		Utils.Docker.labels2Str(summary.Labels),
 	}
 }

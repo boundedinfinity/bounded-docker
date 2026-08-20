@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -17,14 +18,31 @@ import (
 var Utils = utils{}
 
 type utils struct {
+	Time      timeUtils
+	Docker    dockerUtils
+	String    stringUtils
+	Tview     tviewUtils
+	Error     errorUtils
+	Fake      fakeUtils
+	Container containerUtils
+	Network   networkUtils
+	Image     imageUtils
 }
 
-func (_ utils) unix2Time(unix int64) string {
+// /////////////////////////////////////////////////////////////////////////////////////////////////
+
+type timeUtils struct{}
+
+func (_ timeUtils) unix2Time(unix int64) string {
 	d := time.Unix(unix, 0)
 	return d.Format(time.RFC3339)
 }
 
-func (_ utils) labels2Str(labels map[string]string) string {
+// /////////////////////////////////////////////////////////////////////////////////////////////////
+
+type dockerUtils struct{}
+
+func (_ dockerUtils) labels2Str(labels map[string]string) string {
 	labelStrs := []string{}
 	for k, v := range labels {
 		labelStrs = append(labelStrs, fmt.Sprintf("%s=%s", k, v))
@@ -32,7 +50,7 @@ func (_ utils) labels2Str(labels map[string]string) string {
 	return strings.Join(labelStrs, ",")
 }
 
-func (_ utils) ports2Str(ports []container.PortSummary) string {
+func (_ dockerUtils) ports2Str(ports []container.PortSummary) string {
 	portStrs := []string{}
 	for _, port := range ports {
 		portStrs = append(portStrs, fmt.Sprintf("%s:%d->%d/%s", port.IP, port.PrivatePort, port.PublicPort, port.Type))
@@ -40,25 +58,36 @@ func (_ utils) ports2Str(ports []container.PortSummary) string {
 	return strings.Join(portStrs, ",")
 }
 
-func (_ utils) index2Str(i int) string {
-	return fmt.Sprintf("%d", i+1)
-}
-
-func (_ utils) size2Str(s int64) string {
-	return humanize.Bytes(uint64(s))
-}
-
-func (_ utils) repoTags2Str(tags []string) string {
+func (_ dockerUtils) repoTags2Str(tags []string) string {
 	return strings.Join(tags, "\n")
 }
 
-func (_ utils) strNormal(text string, colWidth int) string {
+// /////////////////////////////////////////////////////////////////////////////////////////////////
+
+type stringUtils struct{}
+
+func (_ stringUtils) padRight(text string, width int) string {
+	width = max(width, len(text))
+	size := width - len(text)
+	padding := strings.Repeat(" ", size)
+	return text + padding
+}
+
+func (_ stringUtils) pad(text string, width int) string {
+	width = max(width, len(text))
+	size := width - len(text)
+	size /= 2
+	padding := strings.Repeat(" ", size)
+	return padding + text + padding
+}
+
+func (_ stringUtils) strNormal(text string, colWidth int) string {
 	text = strings.TrimSpace(text)
-	text = Utils.truncateString(text, "...", colWidth)
+	text = Utils.String.truncateString(text, "...", colWidth)
 	return text
 }
 
-func (_ utils) truncateString(s, suffix string, maxWidth int) string {
+func (_ stringUtils) truncateString(s, suffix string, maxWidth int) string {
 	if len(s) <= maxWidth {
 		return s
 	}
@@ -72,7 +101,47 @@ func (_ utils) truncateString(s, suffix string, maxWidth int) string {
 	return s[:maxWidth-suffixWidth] + suffix
 }
 
-func (_ utils) tcellEvent2Str(event *tcell.EventKey) string {
+func (_ stringUtils) calcMax(rows [][]string) int {
+	width := 0
+
+	for _, row := range rows {
+		for _, text := range row {
+			width = max(width, len(text))
+		}
+	}
+
+	width += 10
+	return width
+}
+
+func (_ stringUtils) calcMin(rows [][]string) int {
+	width := math.MaxInt
+
+	for _, row := range rows {
+		for _, text := range row {
+			width = min(width, len(text))
+		}
+	}
+
+	width += 10
+	return width
+}
+
+// /////////////////////////////////////////////////////////////////////////////////////////////////
+
+func (_ utils) size2Str(s int64) string {
+	return humanize.Bytes(uint64(s))
+}
+
+func (_ utils) index2Str(i int) string {
+	return fmt.Sprintf("%d", i+1)
+}
+
+// /////////////////////////////////////////////////////////////////////////////////////////////////
+
+type tviewUtils struct{}
+
+func (_ tviewUtils) tcellEvent2Str(event *tcell.EventKey) string {
 	key := string(event.Name())
 	key = strings.Replace(key, "Rune[", "", 1)
 	key = strings.Replace(key, "]", "", 1)
@@ -81,7 +150,7 @@ func (_ utils) tcellEvent2Str(event *tcell.EventKey) string {
 	return key
 }
 
-func (_ utils) state2Rows(state *state.State) [][]string {
+func (_ tviewUtils) state2Rows(state *state.State) [][]string {
 	rows := [][]string{}
 	row := []string{}
 
@@ -91,7 +160,7 @@ func (_ utils) state2Rows(state *state.State) [][]string {
 			keys = append(keys, key.Name)
 		}
 
-		text := fmt.Sprintf("%s -> %s", strings.Join(keys, "/"), transistion.State.Name)
+		text := fmt.Sprintf("%s › %s", strings.Join(keys, "/"), transistion.State.Name)
 		row = append(row, text)
 	}
 
@@ -104,7 +173,7 @@ func (_ utils) state2Rows(state *state.State) [][]string {
 			keys = append(keys, key.Name)
 		}
 
-		text := fmt.Sprintf("%s -> %s", strings.Join(keys, "/"), command.Name)
+		text := fmt.Sprintf("%s › %s", strings.Join(keys, "/"), command.Name)
 		row = append(row, text)
 	}
 
@@ -112,16 +181,22 @@ func (_ utils) state2Rows(state *state.State) [][]string {
 	return rows
 }
 
-func (_ utils) state2Table(state *state.State) *tview.Table {
-	rows := Utils.state2Rows(state)
+func (_ tviewUtils) state2Table(state *state.State) *tview.Table {
+	rows := Utils.Tview.state2Rows(state)
+	width := Utils.String.calcMax(rows) + 5
+
 	table := tview.NewTable()
+	// .SetBorders(true)
+	table.SetBorderPadding(1, 1, 1, 1)
 
 	for r, row := range rows {
 		for c, text := range row {
+			text = Utils.String.padRight(text, width)
 			cell := tview.NewTableCell(text).
 				SetTextColor(tcell.ColorWhite).
 				SetAlign(tview.AlignCenter).
 				SetSelectable(false)
+				// SetBackgroundColor(tcell.ColorDarkGray)
 			table.SetCell(r, c, cell)
 		}
 	}
@@ -131,7 +206,9 @@ func (_ utils) state2Table(state *state.State) *tview.Table {
 
 // /////////////////////////////////////////////////////////////////////////////////////////////////
 
-func createFakeErrors() []error {
+type fakeUtils struct{}
+
+func (_ fakeUtils) createFakeErrors() []error {
 	return []error{}
 	// return []error{
 	// 	errors.New("error 1"),
@@ -140,11 +217,19 @@ func createFakeErrors() []error {
 	// }
 }
 
-func errorTitles() []string {
+// /////////////////////////////////////////////////////////////////////////////////////////////////
+
+type errorUtils struct{}
+
+func (_ errorUtils) errorTitles() []string {
 	return []string{"#", "Error"}
 }
 
-func error2Row(i int, err error) []string {
+func (_ errorUtils) id(err error) string {
+	return ""
+}
+
+func (_ errorUtils) error2Row(i int, err error) []string {
 	return []string{
 		Utils.index2Str(i),
 		err.Error(),

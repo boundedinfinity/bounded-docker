@@ -4,20 +4,26 @@ import (
 	"github.com/moby/moby/api/types/image"
 )
 
-func imageTitles() []string {
+type imageUtils struct{}
+
+func (_ imageUtils) imageTitles() []string {
 	return []string{"#", "ID", "Image", "Size"}
 }
 
-func image2Row(i int, summary image.Summary) []string {
+func (_ imageUtils) id(summary image.Summary) string {
+	return summary.ID
+}
+
+func (_ imageUtils) image2Row(i int, summary image.Summary) []string {
 	return []string{
 		Utils.index2Str(i),
 		summary.ID,
-		Utils.repoTags2Str(summary.RepoTags),
+		Utils.Docker.repoTags2Str(summary.RepoTags),
 		Utils.size2Str(summary.Size),
 	}
 }
 
-func createFakeImages() []image.Summary {
+func (_ imageUtils) createFakeImages() []image.Summary {
 	return []image.Summary{}
 
 	// return []image.Summary{

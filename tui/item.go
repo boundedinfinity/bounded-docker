@@ -6,14 +6,14 @@ import (
 	"github.com/rivo/tview"
 )
 
-func newInfo[T any](tui *tui, title string, headers []string, fn func(i int, item T) []string) Info {
+func newInfo[T any](tui *tui, title string, headers []string, rowFn func(i int, item T) []string, idFn func(item T) string) Info {
 	info := &info[T]{
-		Title:        title,
-		Items:        []T{},
-		headers:      headers,
-		tui:          tui,
-		item2RowFunc: fn,
-		selectedRow:  0,
+		Title:   title,
+		Items:   []T{},
+		headers: headers,
+		tui:     tui,
+		rowFunc: rowFn,
+		idFunc:  idFn,
 	}
 
 	info.header = tview.NewTextView()
@@ -23,7 +23,6 @@ func newInfo[T any](tui *tui, title string, headers []string, fn func(i int, ite
 		SetFixed(1, len(headers)).
 		SetEvaluateAllRows(true).
 		SetSelectable(true, false)
-
 	return info
 }
 
@@ -32,24 +31,39 @@ type Info interface {
 	Focus()
 	Header() *tview.TextView
 	Data() *tview.Table
+	Id() (string, bool)
 	Init()
 }
 
 type info[T any] struct {
-	Title        string
-	Items        []T
-	tui          *tui
-	headers      []string
-	header       *tview.TextView
-	data         *tview.Table
-	item2RowFunc func(int, T) []string
-	colWidth     int
-	selectedRow  int
+	Title    string
+	Items    []T
+	item     T
+	tui      *tui
+	headers  []string
+	header   *tview.TextView
+	data     *tview.Table
+	idFunc   func(T) string
+	rowFunc  func(int, T) []string
+	colWidth int
+	zero     T
 }
 
 func (this *info[T]) Init() {
-	this.data.SetSelectedFunc(func(row, _ int) { this.selectedRow = row })
 	this.update([]T{})
+}
+
+func (this *info[T]) Id() (string, bool) {
+	row, _ := this.data.GetSelection()
+	idx := row - 1
+
+	if this.idFunc != nil && idx >= 0 && idx < len(this.Items) {
+		item := this.Items[idx]
+		id := this.idFunc(item)
+		return id, id != ""
+	}
+
+	return "", false
 }
 
 func (this *info[T]) Update(items any) {
@@ -91,7 +105,7 @@ func (this *info[T]) update(items []T) {
 	data := [][]string{this.headers}
 
 	for i, item := range this.Items {
-		data = append(data, this.item2RowFunc(i, item))
+		data = append(data, this.rowFunc(i, item))
 	}
 
 	this.header.Clear()

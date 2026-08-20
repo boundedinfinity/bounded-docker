@@ -6,21 +6,27 @@ import (
 	"github.com/moby/moby/api/types/container"
 )
 
-func containerTitles() []string {
+type containerUtils struct{}
+
+func (_ containerUtils) containerTitles() []string {
 	return []string{"#", "ID", "Image", "Command", "Created", "Status", "Names", "Ports", "Labels"}
 }
 
-func container2Row(i int, summary container.Summary) []string {
+func (_ containerUtils) containerId(summary container.Summary) string {
+	return summary.ID
+}
+
+func (_ containerUtils) container2Row(i int, summary container.Summary) []string {
 	return []string{
 		Utils.index2Str(i),
 		summary.ID,
 		summary.Image,
 		summary.Command,
-		Utils.unix2Time(summary.Created),
+		Utils.Time.unix2Time(summary.Created),
 		summary.Status,
 		strings.Join(summary.Names, ","),
-		Utils.ports2Str(summary.Ports),
-		Utils.labels2Str(summary.Labels),
+		Utils.Docker.ports2Str(summary.Ports),
+		Utils.Docker.labels2Str(summary.Labels),
 	}
 }
 

@@ -7,18 +7,18 @@ type State struct {
 	Transitions []Transistion
 }
 
-func (this *State) Next(code string) (*State, bool) {
+func (this *State) Next(code string) (*State, *Command, bool) {
 	for _, transistion := range this.Transitions {
 		if transistion.Matches(code) {
-			return transistion.State, true
+			return transistion.State, nil, true
 		}
 	}
 
-	for _, navigation := range this.Commands {
-		if navigation.Matches(code) {
-			return this, true
+	for _, command := range this.Commands {
+		if command.Matches(code) {
+			return this, &command, true
 		}
 	}
 
-	return this, false
+	return this, nil, false
 }
