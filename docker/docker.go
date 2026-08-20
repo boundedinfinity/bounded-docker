@@ -4,10 +4,6 @@ import (
 	"context"
 	"sync"
 
-	"github.com/moby/moby/api/types/container"
-	"github.com/moby/moby/api/types/image"
-	"github.com/moby/moby/api/types/network"
-	"github.com/moby/moby/client"
 	moby "github.com/moby/moby/client"
 )
 
@@ -15,7 +11,7 @@ const (
 	__USER_AGENT = "bounded-docker/1.0.0"
 )
 
-func NewDocker(wg *sync.WaitGroup, ctx context.Context) (*dockerSystem, error) {
+func NewDocker(wg *sync.WaitGroup, ctx context.Context) (*System, error) {
 	api, err := moby.New(
 		moby.FromEnv,
 		moby.WithUserAgent(__USER_AGENT),
@@ -25,37 +21,52 @@ func NewDocker(wg *sync.WaitGroup, ctx context.Context) (*dockerSystem, error) {
 		return nil, err
 	}
 
-	return &dockerSystem{
-		ErrCh:        make(chan error),
-		ContainersCh: make(chan []container.Summary),
-		ImagesCh:     make(chan []image.Summary),
-		NetworksCh:   make(chan []network.Summary),
-		wg:           wg,
-		api:          api,
-		ctx:          ctx,
+	errCh := make(chan error)
+
+	return &System{
+		ErrCh:      errCh,
+		wg:         wg,
+		api:        api,
+		ctx:        ctx,
+		containers: newCaller(wg, ctx, errCh, moby.ContainerListOptions{All: true}, api.ContainerList),
+		images:     newCaller(wg, ctx, errCh, moby.ImageListOptions{All: true}, api.ImageList),
+		networks:   newCaller(wg, ctx, errCh, moby.NetworkListOptions{}, api.NetworkList),
 	}, nil
 }
 
-type dockerSystem struct {
-	ContainersCh chan []container.Summary
-	ImagesCh     chan []image.Summary
-	NetworksCh   chan []network.Summary
-	ErrCh        chan error
-	wg           *sync.WaitGroup
-	api          *client.Client
-	ctx          context.Context
+type System struct {
+	containers *caller[moby.ContainerListResult, moby.ContainerListOptions]
+	images     *caller[moby.ImageListResult, moby.ImageListOptions]
+	networks   *caller[moby.NetworkListResult, moby.NetworkListOptions]
+	ErrCh      chan error
+	wg         *sync.WaitGroup
+	api        *moby.Client
+	ctx        context.Context
 }
 
-func (this *dockerSystem) findDocker() error {
-	return nil
+func (this *System) Containers() chan moby.ContainerListResult {
+	return this.containers.Out()
 }
 
-func (this *dockerSystem) Init() {
+func (this *System) Images() chan moby.ImageListResult {
+	return this.images.Out()
+}
+
+func (this *System) Networks() chan moby.NetworkListResult {
+	return this.networks.Out()
+}
+
+func (this *System) Init() {
 	this.wg.Go(func() {
+		this.images.Init()
+		this.containers.Init()
+		this.networks.Init()
 		result := this.api.Events(this.ctx, moby.EventsListOptions{})
+
 		for {
 			select {
 			case <-this.ctx.Done():
+				this.Stop()
 				return
 			case err := <-result.Err:
 				go func() { this.ErrCh <- err }()
@@ -71,45 +82,43 @@ func (this *dockerSystem) Init() {
 			}
 		}
 	})
-
-	this.ListContainers()
-	this.ListImages()
-	this.ListNetworks()
 }
 
-func (this *dockerSystem) ListContainers() {
-	this.wg.Go(func() {
-		o := client.ContainerListOptions{
-			All: true,
-		}
-		if result, err := this.api.ContainerList(this.ctx, o); err == nil {
-			go func() { this.ContainersCh <- result.Items }()
-		} else {
-			go func() { this.ErrCh <- err }()
-		}
-	})
+func (this *System) Stop() {
+
 }
 
-func (this *dockerSystem) ListImages() {
-	this.wg.Go(func() {
-		o := client.ImageListOptions{
-			All: true,
-		}
-		if result, err := this.api.ImageList(this.ctx, o); err == nil {
-			go func() { this.ImagesCh <- result.Items }()
-		} else {
-			go func() { this.ErrCh <- err }()
-		}
-	})
+func (this *System) ListContainers() {
+	this.containers.Run()
 }
 
-func (this *dockerSystem) ListNetworks() {
-	this.wg.Go(func() {
-		o := client.NetworkListOptions{}
-		if result, err := this.api.NetworkList(this.ctx, o); err == nil {
-			go func() { this.NetworksCh <- result.Items }()
-		} else {
-			go func() { this.ErrCh <- err }()
-		}
-	})
+func (this *System) ListImages() {
+	this.images.Run()
+}
+
+func (this *System) ListNetworks() {
+	this.networks.Run()
+}
+
+type logContext struct {
+	result moby.ContainerLogsResult
+	cancel context.CancelFunc
+}
+
+func (this *System) GetLogs(id string) {
+	// this.wg.Go(func() {
+	// 	o := client.ContainerLogsOptions{
+	// 		ShowStdout: true,
+	// 		ShowStderr: true,
+	// 		Follow:     true,
+	// 	}
+
+	// 	ctx, cancel := context.WithCancel(this.ctx)
+
+	// 	if result, err := this.api.ContainerLogs(ctx, id, o); err == nil {
+	// 		// go func() { this.lo <- result.Items }()
+	// 	} else {
+	// 		go func() { this.ErrCh <- err }()
+	// 	}
+	// })
 }

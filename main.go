@@ -26,44 +26,26 @@ func main() {
 		os.Exit(1)
 	}
 
+	wg.Go(func() {
+		d.Init()
+	})
+
 	machine, err := state.New(state.DefaultConfig())
 	if err != nil {
 		panic(err)
 	}
 
-	tui := tui.NewTui(machine)
+	tui := tui.NewTui(wg, ctx, cancel, machine, d)
 	wg.Go(func() {
 		if err = tui.Run(); err != nil {
 			cancel()
 		}
 	})
 
-	wg.Go(func() {
-		for {
-			select {
-			case <-ctx.Done():
-				tui.Stop()
-				return
-			case err := <-d.ErrCh:
-				tui.Send(err)
-			case summary := <-d.ContainersCh:
-				tui.Send(summary)
-			case networks := <-d.NetworksCh:
-				tui.Send(networks)
-			case images := <-d.ImagesCh:
-				tui.Send(images)
-			}
-		}
-	})
-
 	go func() {
 		<-sigCh
 		cancel()
-		if tui != nil {
-			tui.Stop()
-		}
 	}()
 
-	d.Init()
 	wg.Wait()
 }
