@@ -9,7 +9,7 @@ import (
 	"github.com/rivo/tview"
 )
 
-func NewTui(wg *sync.WaitGroup, ctx context.Context, cancel context.CancelFunc, sm *state.Machine, docker *docker.System) *tui {
+func New(wg *sync.WaitGroup, ctx context.Context, cancel context.CancelFunc, sm *state.Machine, docker *docker.System) *tui {
 	app := tview.NewApplication()
 
 	tui := &tui{

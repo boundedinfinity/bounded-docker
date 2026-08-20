@@ -20,7 +20,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	wg := &sync.WaitGroup{}
 
-	d, err := docker.NewDocker(wg, ctx)
+	d, err := docker.New(wg, ctx)
 	if err != nil {
 		fmt.Println("Error creating Docker client:", err)
 		os.Exit(1)
@@ -35,7 +35,7 @@ func main() {
 		panic(err)
 	}
 
-	tui := tui.NewTui(wg, ctx, cancel, machine, d)
+	tui := tui.New(wg, ctx, cancel, machine, d)
 	wg.Go(func() {
 		if err = tui.Run(); err != nil {
 			cancel()
