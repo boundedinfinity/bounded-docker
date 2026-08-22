@@ -27,7 +27,7 @@ func main() {
 	}
 
 	wg.Go(func() {
-		d.Init()
+		d.Run()
 	})
 
 	machine, err := state.New(state.DefaultConfig())

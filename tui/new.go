@@ -24,15 +24,10 @@ func New(wg *sync.WaitGroup, ctx context.Context, cancel context.CancelFunc, sm 
 		wg:     wg,
 	}
 
-	tui.containers = newInfo(tui, "Containers", Utils.Container.containerTitles(), Utils.Container.container2Row, Utils.Container.containerId)
-	tui.images = newInfo(tui, "Images", Utils.Image.imageTitles(), Utils.Image.image2Row, Utils.Image.id)
-	tui.networks = newInfo(tui, "Networks", Utils.Network.networkTitles(), Utils.Network.network2Row, Utils.Network.id)
+	tui.containers = newInfo(tui, "Containers", Utils.Container.titles(), Utils.Container.summary2rows, Utils.Container.id)
+	tui.images = newInfo(tui, "Images", Utils.Image.titles(), Utils.Image.summary2row, Utils.Image.id)
+	tui.networks = newInfo(tui, "Networks", Utils.Network.titles(), Utils.Network.summary2rows, Utils.Network.id)
 	tui.errors = newInfo(tui, "Errors", Utils.Error.errorTitles(), Utils.Error.error2Row, nil)
-
-	tui.containers.Init()
-	tui.images.Init()
-	tui.networks.Init()
-	tui.errors.Init()
 
 	tui.pages = tview.NewPages().
 		AddPage("root", tui.root, true, true).
@@ -71,7 +66,16 @@ func (this *tui) newNavigation() *tview.Pages {
 	return pages
 }
 
-func (this *tui) setStatus(format string, a ...any) {
+func (this *tui) setStatus(text string) {
+	this.wg.Go(func() {
+		this.app.QueueUpdateDraw(func() {
+			this.status.Clear()
+			fmt.Fprint(this.status, text)
+		})
+	})
+}
+
+func (this *tui) setStatusf(format string, a ...any) {
 	this.wg.Go(func() {
 		this.app.QueueUpdateDraw(func() {
 			this.status.Clear()

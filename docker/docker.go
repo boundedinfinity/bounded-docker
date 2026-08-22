@@ -12,13 +12,15 @@ const (
 )
 
 type System struct {
-	containers *caller[moby.ContainerListResult, moby.ContainerListOptions]
-	images     *caller[moby.ImageListResult, moby.ImageListOptions]
-	networks   *caller[moby.NetworkListResult, moby.NetworkListOptions]
-	ErrCh      chan error
-	wg         *sync.WaitGroup
-	api        *moby.Client
-	ctx        context.Context
+	containers       *caller0[moby.ContainerListResult, moby.ContainerListOptions]
+	containerInspect *caller1[moby.ContainerInspectResult, string, moby.ContainerInspectOptions]
+	containerLogs    *caller1[moby.ContainerLogsResult, string, moby.ContainerLogsOptions]
+	images           *caller0[moby.ImageListResult, moby.ImageListOptions]
+	networks         *caller0[moby.NetworkListResult, moby.NetworkListOptions]
+	ErrCh            chan error
+	wg               *sync.WaitGroup
+	api              *moby.Client
+	ctx              context.Context
 }
 
 func (this *System) Containers() chan moby.ContainerListResult {
@@ -33,11 +35,11 @@ func (this *System) Networks() chan moby.NetworkListResult {
 	return this.networks.Out()
 }
 
-func (this *System) Init() {
+func (this *System) Run() {
 	this.wg.Go(func() {
-		this.images.Init()
-		this.containers.Init()
-		this.networks.Init()
+		this.images.loop()
+		this.containers.loop()
+		this.networks.loop()
 		result := this.api.Events(this.ctx, moby.EventsListOptions{})
 
 		for {
@@ -66,15 +68,15 @@ func (this *System) Stop() {
 }
 
 func (this *System) ListContainers() {
-	this.containers.Run()
+	this.containers.Run(nil)
 }
 
 func (this *System) ListImages() {
-	this.images.Run()
+	this.images.Run(nil)
 }
 
 func (this *System) ListNetworks() {
-	this.networks.Run()
+	this.networks.Run(nil)
 }
 
 type logContext struct {

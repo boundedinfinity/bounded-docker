@@ -18,12 +18,11 @@ func Test_StateMachine_Creation_Default(t *testing.T) {
 	assert.Equal(t, "root", machine.Current.Id)
 
 	// c := tea.KeyPressMsg{Text: "c", Mod: 0, Code: 99, ShiftedCode: 0, BaseCode: 0, IsRepeat: false}
-	next, _, ok := machine.Next("c")
-	assert.True(t, ok)
-	assert.Equal(t, "containers", next.Id)
+	next, _ := machine.Next("c")
+	assert.Equal(t, "container.list", next.Id)
 
 	// up := tea.KeyPressMsg{Text: "j", Mod: 0, Code: 106, ShiftedCode: 0, BaseCode: 0, IsRepeat: false}
-	next, _, ok = machine.Next("up")
-	assert.True(t, ok)
-	assert.Equal(t, "containers", next.Id)
+	next, command := machine.Next("up")
+	assert.Equal(t, "container.list", next.Id)
+	assert.Equal(t, "line.up", command.Id)
 }

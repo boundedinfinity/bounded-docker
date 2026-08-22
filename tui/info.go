@@ -6,7 +6,11 @@ import (
 	"github.com/rivo/tview"
 )
 
-func newInfo[T any](tui *tui, title string, headers []string, rowFn func(i int, item T) []string, idFn func(item T) string) Info {
+func newInfo[T any](
+	tui *tui, title string, headers []string,
+	rowFn func(i int, item T) []string,
+	idFn func(item T) string,
+) Info {
 	info := &info[T]{
 		Title:   title,
 		Items:   []T{},
@@ -27,12 +31,12 @@ func newInfo[T any](tui *tui, title string, headers []string, rowFn func(i int, 
 }
 
 type Info interface {
+	Queue(items any)
 	Update(items any)
 	Focus()
 	Header() *tview.TextView
 	Data() *tview.Table
 	Id() (string, bool)
-	Init()
 }
 
 type info[T any] struct {
@@ -45,12 +49,9 @@ type info[T any] struct {
 	data     *tview.Table
 	idFunc   func(T) string
 	rowFunc  func(int, T) []string
+	initFunc func()
 	colWidth int
 	zero     T
-}
-
-func (this *info[T]) Init() {
-	this.update([]T{})
 }
 
 func (this *info[T]) Id() (string, bool) {
@@ -66,17 +67,6 @@ func (this *info[T]) Id() (string, bool) {
 	return "", false
 }
 
-func (this *info[T]) Update(items any) {
-	switch v := any(items).(type) {
-	case T:
-		this.Append(v)
-	case []T:
-		this.Set(v)
-	case nil:
-		this.Set([]T{})
-	}
-}
-
 func (this *info[T]) Header() *tview.TextView {
 	return this.header
 }
@@ -85,33 +75,47 @@ func (this *info[T]) Data() *tview.Table {
 	return this.data
 }
 
-func (this *info[T]) Append(item T) {
-	this.Set(append(this.Items, item))
-}
-
-func (this *info[T]) Set(items []T) {
-	this.tui.app.QueueUpdateDraw(func() {
-		this.update(items)
-	})
-}
-
 func (this *info[T]) Focus() {
 	this.tui.app.SetFocus(this.data)
 }
 
-func (this *info[T]) update(items []T) {
-	this.Items = items
-	count := len(this.Items)
+func (this *info[T]) rows() ([][]string, int) {
 	data := [][]string{this.headers}
 
 	for i, item := range this.Items {
 		data = append(data, this.rowFunc(i, item))
 	}
 
-	this.header.Clear()
+	return data, len(this.Items)
+}
+
+func (this *info[T]) Queue(items any) {
+	this.tui.wg.Go(func() {
+		this.tui.app.QueueUpdate(func() {
+			this.Update(items)
+		})
+	})
+}
+
+func (this *info[T]) Update(items any) {
+	switch v := any(items).(type) {
+	case T:
+		this.Set([]T{v})
+	case []T:
+		this.Set(v)
+	case nil:
+		this.Set([]T{})
+	}
+}
+
+func (this *info[T]) Set(items []T) {
+	this.Items = items
+	data, count := this.rows()
+
+	// this.header.Clear()
 	fmt.Fprintf(this.header, "%s [%d]", this.Title, count)
 
-	this.data.Clear()
+	// this.data.Clear()
 	for row, vals := range data {
 		for col, text := range vals {
 			cell := tview.NewTableCell(text)

@@ -29,6 +29,7 @@ type tui struct {
 	menu        *tview.Flex
 	nav         *tview.Pages
 	pages       *tview.Pages
+	current     string
 	screenWidth int
 	logsCh      chan moby.ContainerLogsResult
 	logsCtx     context.Context
@@ -41,6 +42,13 @@ var (
 )
 
 func (this *tui) Run() error {
+	// queue := func(fn func()) {
+	// 	this.wg.Go(func() {
+	// 		this.app.QueueUpdate(fn)
+	// 		this.app.Draw()
+	// 	})
+	// }
+
 	this.wg.Go(func() {
 		for {
 			select {
@@ -48,13 +56,13 @@ func (this *tui) Run() error {
 				this.Stop()
 				return
 			case result := <-this.docker.Containers():
-				this.containers.Update(result.Items)
+				this.containers.Queue(result.Items)
 			case result := <-this.docker.Images():
-				this.images.Update(result.Items)
+				this.images.Queue(result.Items)
 			case result := <-this.docker.Networks():
-				this.networks.Update(result.Items)
+				this.networks.Queue(result.Items)
 			case err := <-this.docker.ErrCh:
-				this.errors.Update(err)
+				this.errors.Queue(err)
 			case result := <-this.logsCh:
 				defer result.Close()
 				fmt.Printf("%v\n", result)
@@ -79,38 +87,37 @@ func (this *tui) handleRedraw(screen tcell.Screen) bool {
 
 func (this *tui) handleInput(event *tcell.EventKey) *tcell.EventKey {
 	key := Utils.Tview.tcellEvent2Str(event)
+	state, cmd := this.sm.Next(key)
 
-	if state, cmd, ok := this.sm.Next(key); ok {
-		this.pages.SwitchToPage(state.Id)
-		this.nav.SwitchToPage(state.Id)
-
-		switch state.Id {
+	if cmd != nil {
+		switch cmd.Id {
 		case "quit":
 			this.cancel()
 			return nil
-		case "containers":
-			this.app.SetFocus(this.containers.Data())
-		case "images":
-			this.app.SetFocus(this.images.Data())
-		case "errors":
-			this.app.SetFocus(this.errors.Data())
-		case "networks":
-			this.app.SetFocus(this.networks.Data())
-		case "container-details":
+		case "up", "down":
+			return event
+		}
+	}
+
+	if this.current != state.Id {
+		this.current = state.Id
+		this.pages.SwitchToPage(state.Id)
+		this.nav.SwitchToPage(state.Id)
+		// this.app.Draw()
+
+		switch state.Id {
+		case "container.list":
+			this.docker.ListContainers()
+		case "container.details":
+			text := "Container"
 			if id, ok := this.containers.Id(); ok {
-				this.setStatus("Container: %s", id)
-			} else {
-				fmt.Println("Container: <none>")
+				text += "[" + id + "]"
 			}
+
+			this.setStatus(text)
 		}
 
-		if cmd != nil {
-			switch cmd.Name {
-			case "up", "down":
-				return event
-			}
-		}
-
+		this.app.ForceDraw()
 		return nil
 	}
 

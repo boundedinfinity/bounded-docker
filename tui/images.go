@@ -6,7 +6,7 @@ import (
 
 type imageUtils struct{}
 
-func (_ imageUtils) imageTitles() []string {
+func (_ imageUtils) titles() []string {
 	return []string{"#", "ID", "Image", "Size"}
 }
 
@@ -14,7 +14,7 @@ func (_ imageUtils) id(summary image.Summary) string {
 	return summary.ID
 }
 
-func (_ imageUtils) image2Row(i int, summary image.Summary) []string {
+func (_ imageUtils) summary2row(i int, summary image.Summary) []string {
 	return []string{
 		Utils.index2Str(i),
 		summary.ID,
@@ -23,7 +23,7 @@ func (_ imageUtils) image2Row(i int, summary image.Summary) []string {
 	}
 }
 
-func (_ imageUtils) createFakeImages() []image.Summary {
+func (_ imageUtils) fake() []image.Summary {
 	return []image.Summary{}
 
 	// return []image.Summary{

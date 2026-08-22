@@ -1,23 +1,26 @@
 package state
 
 type MachineConfig struct {
-	Start  string        `json:"start"`
-	States []StateConfig `json:"states"`
-	Keys   []KeyConfig   `json:"keys"`
+	Start       string                   `json:"start"`
+	States      map[string]StateConfig   `json:"states"`
+	Transitions map[string][]string      `json:"transitions"`
+	Commands    map[string]CommandConfig `json:"commands"`
+	Keys        map[string]KeyConfig     `json:"keys"`
 }
 
 type StateConfig struct {
-	Id          string              `json:"id"`
 	Name        string              `json:"name"`
 	Commands    map[string][]string `json:"commands"`
+	Keys        map[string][]string `json:"keys"`
 	Transitions map[string][]string `json:"transitions"`
 }
 
-type TransistionConfig interface {
-	map[string][]string | []string
+type CommandConfig struct {
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Keys        []string `json:"keys"`
 }
 
 type KeyConfig struct {
-	Code string `json:"code"`
 	Name string `json:"name"`
 }

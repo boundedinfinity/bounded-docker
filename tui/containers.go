@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/moby/moby/api/types/container"
@@ -8,15 +9,15 @@ import (
 
 type containerUtils struct{}
 
-func (_ containerUtils) containerTitles() []string {
+func (_ containerUtils) titles() []string {
 	return []string{"#", "ID", "Image", "Command", "Created", "Status", "Names", "Ports", "Labels"}
 }
 
-func (_ containerUtils) containerId(summary container.Summary) string {
+func (_ containerUtils) id(summary container.Summary) string {
 	return summary.ID
 }
 
-func (_ containerUtils) container2Row(i int, summary container.Summary) []string {
+func (_ containerUtils) summary2rows(i int, summary container.Summary) []string {
 	return []string{
 		Utils.index2Str(i),
 		summary.ID,
@@ -30,7 +31,22 @@ func (_ containerUtils) container2Row(i int, summary container.Summary) []string
 	}
 }
 
-func createFakeContainers() []container.Summary {
+func (_ containerUtils) inspect2rows(i int, result container.InspectResponse) [][]string {
+	rows := [][]string{
+		{"ID", result.ID},
+		{"Path", result.Path},
+		{"Created", Utils.Time.strTime(result.Created)},
+		{"Args", strings.Join(result.Args, ",")},
+		{"State", string(result.State.Status)},
+		{"", fmt.Sprintf("%d", result.State.Pid)},
+		{"Image", result.Image},
+		{"Name", result.Name},
+	}
+
+	return rows
+}
+
+func (_ containerUtils) fake() []container.Summary {
 	return []container.Summary{}
 
 	// return []container.Summary{

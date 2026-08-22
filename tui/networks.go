@@ -6,7 +6,7 @@ import (
 
 type networkUtils struct{}
 
-func (_ networkUtils) networkTitles() []string {
+func (_ networkUtils) titles() []string {
 	return []string{"#", "ID", "Name", "Driver", "Scope", "Labels"}
 }
 
@@ -14,7 +14,7 @@ func (_ networkUtils) id(summary network.Summary) string {
 	return summary.ID
 }
 
-func (_ networkUtils) network2Row(i int, summary network.Summary) []string {
+func (_ networkUtils) summary2rows(i int, summary network.Summary) []string {
 	return []string{
 		Utils.index2Str(i),
 		summary.ID,

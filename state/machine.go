@@ -2,6 +2,7 @@ package state
 
 import (
 	"github.com/boundedinfinity/go-commoner/errorer"
+	"github.com/boundedinfinity/go-commoner/idiomatic/mapper"
 )
 
 var (
@@ -13,48 +14,27 @@ var (
 // /////////////////////////////////////////////////////////////////////////////////////////////////
 
 type Machine struct {
-	Current *State
-	states  []*State
-	keys    []*Key
-}
-
-func (this Machine) FindState(id string) (*State, bool) {
-	for _, state := range this.states {
-		if state.Id == id {
-			return state, true
-		}
-	}
-
-	return nil, false
-}
-
-func (this Machine) FindKey(code string) (*Key, bool) {
-	for _, key := range this.keys {
-		if key.Code == code {
-			return key, true
-		}
-	}
-
-	return nil, false
+	Current  *State
+	states   map[string]*State
+	commands map[string]*Command
+	keys     map[string]*Key
 }
 
 func (this Machine) States() []*State {
-	return this.states
+	return mapper.Values(this.states)
 }
 
 func (this Machine) Start() *State {
 	return this.Current
 }
 
-func (this *Machine) Next(code string) (*State, *Command, bool) {
+func (this *Machine) Next(code string) (*State, *Command) {
 	if this.Current == nil {
-		return nil, nil, false
+		panic("state machine is not initialized")
 	}
 
-	next, cmd, ok := this.Current.Next(code)
-	if ok {
-		this.Current = next
-	}
+	var cmd *Command
+	this.Current, cmd = this.Current.Next(code)
 
-	return next, cmd, ok
+	return this.Current, cmd
 }

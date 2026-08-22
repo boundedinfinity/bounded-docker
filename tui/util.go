@@ -34,8 +34,18 @@ type utils struct {
 type timeUtils struct{}
 
 func (_ timeUtils) unix2Time(unix int64) string {
-	d := time.Unix(unix, 0)
-	return d.Format(time.RFC3339)
+	timestamp := time.Unix(unix, 0)
+	return timestamp.Format(time.RFC3339)
+}
+
+func (_ timeUtils) strTime(unix string) string {
+	timestamp, err := time.Parse(time.RFC3339, unix)
+
+	if err != nil {
+		panic(err)
+	}
+
+	return timestamp.Format(time.RFC3339)
 }
 
 // /////////////////////////////////////////////////////////////////////////////////////////////////
@@ -169,11 +179,12 @@ func (_ tviewUtils) state2Rows(state *state.State) [][]string {
 
 	for _, command := range state.Commands {
 		var keys []string
-		for _, key := range command.Keys {
+
+		for _, key := range command.Keys() {
 			keys = append(keys, key.Name)
 		}
 
-		text := fmt.Sprintf("%s › %s", strings.Join(keys, "/"), command.Name)
+		text := fmt.Sprintf("%s › %s", strings.Join(keys, "/"), command.Command.Name)
 		row = append(row, text)
 	}
 

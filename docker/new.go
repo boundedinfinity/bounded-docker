@@ -19,13 +19,15 @@ func New(wg *sync.WaitGroup, ctx context.Context) (*System, error) {
 
 	errCh := make(chan error)
 
-	return &System{
+	s := &System{
 		ErrCh:      errCh,
 		wg:         wg,
 		api:        api,
 		ctx:        ctx,
-		containers: newCaller(wg, ctx, errCh, moby.ContainerListOptions{All: true}, api.ContainerList),
-		images:     newCaller(wg, ctx, errCh, moby.ImageListOptions{All: true}, api.ImageList),
-		networks:   newCaller(wg, ctx, errCh, moby.NetworkListOptions{}, api.NetworkList),
-	}, nil
+		containers: newCaller0(wg, ctx, errCh, moby.ContainerListOptions{All: true}, api.ContainerList),
+		images:     newCaller0(wg, ctx, errCh, moby.ImageListOptions{All: true}, api.ImageList),
+		networks:   newCaller0(wg, ctx, errCh, moby.NetworkListOptions{}, api.NetworkList),
+	}
+
+	return s, nil
 }

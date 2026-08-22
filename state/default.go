@@ -3,108 +3,126 @@ package state
 func DefaultConfig() MachineConfig {
 	return MachineConfig{
 		Start: "root",
-		States: []StateConfig{
-			{
-				Id:   "quit",
-				Name: "Quit",
-			},
-			{
-				Id:   "root",
+		States: map[string]StateConfig{
+			"root": {
 				Name: "Dashboard",
 				Transitions: map[string][]string{
-					"containers": {"c"},
-					"images":     {"i"},
-					"networks":   {"n"},
-					"errors":     {"e"},
-					"quit":       {"q", "esc"},
-				},
-			},
-			{
-				Id:   "containers",
-				Name: "Containers",
-				Commands: map[string][]string{
-					"up":   {"up", "j"},
-					"down": {"down", "k"},
-				},
-				Transitions: map[string][]string{
-					"root":              {"r", "left", "h", "b", "esc"},
-					"container-details": {"d", "enter"},
-					"quit":              {"q"},
-				},
-			},
-			{
-				Id:   "container-details",
-				Name: "Container Details",
-				Transitions: map[string][]string{
-					"root":       {"r"},
-					"containers": {"c", "left", "h", "b", "esc"},
-					"quit":       {"q"},
-				},
-			},
-			{
-				Id:   "images",
-				Name: "Images",
-				Transitions: map[string][]string{
-					"root":          {"r", "left", "h", "b", "esc"},
-					"image-details": {"d", "enter"},
-					"quit":          {"q"},
+					"container.list": {"c"},
+					"image.list":     {"i"},
+					"network.list":   {"n"},
+					"errors":         {"e"},
 				},
 				Commands: map[string][]string{
-					"up":   {"up", "j"},
-					"down": {"down", "k"},
+					"quit": {"[command]", "esc"},
 				},
 			},
-			{
-				Id:   "image-details",
-				Name: "Image Details",
-				Transitions: map[string][]string{
-					"root":   {"r"},
-					"images": {"i", "left", "h", "b", "esc"},
-					"quit":   {"q"},
-				},
-			},
-			{
-				Id:   "networks",
-				Name: "Networks",
-				Transitions: map[string][]string{
-					"root":            {"r", "left", "h", "b", "esc"},
-					"network-details": {"d", "enter"},
-					"quit":            {"q"},
-				},
-				Commands: map[string][]string{
-					"up":   {"up", "j"},
-					"down": {"down", "k"},
-				},
-			},
-			{
-				Id:   "network-details",
-				Name: "Network Details",
-				Transitions: map[string][]string{
-					"root":     {"r"},
-					"networks": {"n", "left", "h", "b", "esc"},
-					"quit":     {"q"},
-				},
-			},
-			{
-				Id:   "errors",
+			"errors": {
 				Name: "Errors",
 				Transitions: map[string][]string{
 					"root":   {"r", "left", "h", "b", "esc"},
-					"quit":   {"q"},
 					"errors": {"y"},
+				},
+				Commands: map[string][]string{
+					"quit":      {},
+					"line.up":   {},
+					"line.down": {},
+				},
+			},
+			"container.list": {
+				Name: "Containers",
+				Commands: map[string][]string{
+					"quit":                {},
+					"line.up":             {"up", "j"},
+					"line.down":           {"down", "k"},
+					"containers.list.all": {"a"},
+				},
+				Transitions: map[string][]string{
+					"root":              {"r", "left", "h", "b", "esc"},
+					"container.details": {"d", "enter"},
+				},
+			},
+			"container.details": {
+				Name: "Container Details",
+				Transitions: map[string][]string{
+					"root":           {"r"},
+					"container.list": {"c", "left", "h", "b", "esc"},
+				},
+				Commands: map[string][]string{
+					"quit": {"[command]"},
+				},
+			},
+			"image.list": {
+				Name: "Images",
+				Transitions: map[string][]string{
+					"root":          {"r", "left", "h", "b", "esc"},
+					"image.details": {"d", "enter"},
 				},
 				Commands: map[string][]string{
 					"up":   {"up", "j"},
 					"down": {"down", "k"},
+					"quit": {},
+				},
+			},
+			"image.details": {
+				Name: "Image Details",
+				Transitions: map[string][]string{
+					"root":       {"r"},
+					"image.list": {"i", "left", "h", "b", "esc"},
+				},
+				Commands: map[string][]string{
+					"quit": {},
+				},
+			},
+			"network.list": {
+				Name: "Networks",
+				Transitions: map[string][]string{
+					"root":            {"r", "left", "h", "b", "esc"},
+					"network.details": {"d", "enter"},
+				},
+				Commands: map[string][]string{
+					"up":   {"up", "j"},
+					"down": {"down", "k"},
+					"quit": {},
+				},
+			},
+			"network.details": {
+				Name: "Network Details",
+				Transitions: map[string][]string{
+					"root":         {"r"},
+					"network.list": {"n", "left", "h", "b", "esc"},
+				},
+				Commands: map[string][]string{
+					"quit": {},
 				},
 			},
 		},
-		Keys: []KeyConfig{
-			{Code: "left", Name: "←"},
-			{Code: "up", Name: "↑"},
-			{Code: "down", Name: "↓"},
-			{Code: "right", Name: "→"},
-			{Code: "enter", Name: "↵"},
+		Commands: map[string]CommandConfig{
+			"quit": {
+				Name: "Quit",
+				Keys: []string{"q"},
+			},
+			"line.up": {
+				Name: "Move Up",
+				Keys: []string{"up", "j"},
+			},
+			"line.down": {
+				Name: "Move Down",
+				Keys: []string{"down", "k"},
+			},
+			"containers.list.all": {
+				Name: "List All Containers",
+			},
+			"errors.copy": {
+				Name: "Copy error to clipboard",
+				Keys: []string{"c"},
+			},
+		},
+		Keys: map[string]KeyConfig{
+			"left":  {Name: "←"},
+			"up":    {Name: "↑"},
+			"down":  {Name: "↓"},
+			"right": {Name: "→"},
+			"enter": {Name: "↵"},
 		},
 	}
 }
