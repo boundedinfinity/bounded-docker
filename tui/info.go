@@ -91,7 +91,7 @@ func (this *info[T]) rows() ([][]string, int) {
 
 func (this *info[T]) Queue(items any) {
 	this.tui.wg.Go(func() {
-		this.tui.app.QueueUpdate(func() {
+		this.tui.app.QueueUpdateDraw(func() {
 			this.Update(items)
 		})
 	})
@@ -112,10 +112,10 @@ func (this *info[T]) Set(items []T) {
 	this.Items = items
 	data, count := this.rows()
 
-	// this.header.Clear()
+	this.header.Clear()
 	fmt.Fprintf(this.header, "%s [%d]", this.Title, count)
 
-	// this.data.Clear()
+	this.data.Clear()
 	for row, vals := range data {
 		for col, text := range vals {
 			cell := tview.NewTableCell(text)

@@ -56,13 +56,13 @@ func (this *tui) Run() error {
 				this.Stop()
 				return
 			case result := <-this.docker.Containers():
-				this.containers.Queue(result.Items)
+				this.containers.Update(result.Items)
 			case result := <-this.docker.Images():
-				this.images.Queue(result.Items)
+				this.images.Update(result.Items)
 			case result := <-this.docker.Networks():
-				this.networks.Queue(result.Items)
+				this.networks.Update(result.Items)
 			case err := <-this.docker.ErrCh:
-				this.errors.Queue(err)
+				this.errors.Update(err)
 			case result := <-this.logsCh:
 				defer result.Close()
 				fmt.Printf("%v\n", result)
@@ -70,6 +70,9 @@ func (this *tui) Run() error {
 		}
 	})
 
+	this.docker.ListContainers()
+	this.docker.ListImages()
+	this.docker.ListNetworks()
 	return this.app.Run()
 }
 
@@ -89,6 +92,8 @@ func (this *tui) handleInput(event *tcell.EventKey) *tcell.EventKey {
 	key := Utils.Tview.tcellEvent2Str(event)
 	state, cmd := this.sm.Next(key)
 
+	this.setStatus(state.Id)
+
 	if cmd != nil {
 		switch cmd.Id {
 		case "quit":
@@ -103,11 +108,9 @@ func (this *tui) handleInput(event *tcell.EventKey) *tcell.EventKey {
 		this.current = state.Id
 		this.pages.SwitchToPage(state.Id)
 		this.nav.SwitchToPage(state.Id)
-		// this.app.Draw()
 
 		switch state.Id {
-		case "container.list":
-			this.docker.ListContainers()
+
 		case "container.details":
 			text := "Container"
 			if id, ok := this.containers.Id(); ok {

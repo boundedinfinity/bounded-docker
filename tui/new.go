@@ -31,9 +31,9 @@ func New(wg *sync.WaitGroup, ctx context.Context, cancel context.CancelFunc, sm 
 
 	tui.pages = tview.NewPages().
 		AddPage("root", tui.root, true, true).
-		AddPage("containers", tui.containers.Data(), true, true).
-		AddPage("images", tui.images.Data(), true, false).
-		AddPage("networks", tui.networks.Data(), true, false).
+		AddPage("container.list", tui.containers.Data(), true, false).
+		AddPage("image.list", tui.images.Data(), true, false).
+		AddPage("network.list", tui.networks.Data(), true, false).
 		AddPage("errors", tui.errors.Data(), true, false).
 		SwitchToPage(tui.sm.Start().Id)
 
@@ -55,7 +55,7 @@ func New(wg *sync.WaitGroup, ctx context.Context, cancel context.CancelFunc, sm 
 
 func (this *tui) newNavigation() *tview.Pages {
 	pages := tview.NewPages()
-	pages.SetBorder(true).SetTitle(" [ Navigation ]")
+	pages.SetBorder(true).SetTitle(" [ Navigation ] ")
 
 	for _, state := range this.sm.States() {
 		pages.AddPage(state.Id, Utils.Tview.state2Table(state), true, false)
