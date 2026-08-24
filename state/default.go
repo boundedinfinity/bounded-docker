@@ -31,10 +31,10 @@ func DefaultConfig() MachineConfig {
 			"container.list": {
 				Name: "Containers",
 				Commands: map[string][]string{
-					"quit":                {},
-					"line.up":             {"up", "j"},
-					"line.down":           {"down", "k"},
-					"containers.list.all": {"a"},
+					"quit":               {},
+					"line.up":            {"up", "j"},
+					"line.down":          {"down", "k"},
+					"container.list.all": {"a"},
 				},
 				Transitions: map[string][]string{
 					"root":              {"r", "left", "h", "b", "esc"},
@@ -109,7 +109,7 @@ func DefaultConfig() MachineConfig {
 				Name: "Move Down",
 				Keys: []string{"down", "k"},
 			},
-			"containers.list.all": {
+			"container.list.all": {
 				Name: "List All Containers",
 			},
 			"errors.copy": {

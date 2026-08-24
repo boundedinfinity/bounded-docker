@@ -7,6 +7,7 @@ import (
 
 	"github.com/boundedinfinity/docker-tui/docker"
 	"github.com/boundedinfinity/docker-tui/state"
+	moby "github.com/moby/moby/client"
 	"github.com/rivo/tview"
 )
 
@@ -24,10 +25,16 @@ func New(wg *sync.WaitGroup, ctx context.Context, cancel context.CancelFunc, sm 
 		wg:     wg,
 	}
 
-	tui.containers = newInfo(tui, "Containers", Utils.Container.titles(), Utils.Container.summary2rows, Utils.Container.id)
-	tui.images = newInfo(tui, "Images", Utils.Image.titles(), Utils.Image.summary2row, Utils.Image.id)
-	tui.networks = newInfo(tui, "Networks", Utils.Network.titles(), Utils.Network.summary2rows, Utils.Network.id)
-	tui.errors = newInfo(tui, "Errors", Utils.Error.errorTitles(), Utils.Error.error2Row, nil)
+	tui.containers = newInfo(tui, "Containers", Utils.Container.titles(),
+		moby.ContainerListOptions{All: true},
+		Utils.Container.summary2rows, Utils.Container.id)
+	tui.images = newInfo(tui, "Images", Utils.Image.titles(),
+		moby.ImageListOptions{},
+		Utils.Image.summary2row, Utils.Image.id)
+	tui.networks = newInfo(tui, "Networks", Utils.Network.titles(),
+		moby.NetworkListOptions{},
+		Utils.Network.summary2rows, Utils.Network.id)
+	tui.errors = newInfo(tui, "Errors", Utils.Error.errorTitles(), int(0), Utils.Error.error2Row, nil)
 
 	tui.pages = tview.NewPages().
 		AddPage("root", tui.root, true, true).
@@ -35,12 +42,13 @@ func New(wg *sync.WaitGroup, ctx context.Context, cancel context.CancelFunc, sm 
 		AddPage("image.list", tui.images.Data(), true, false).
 		AddPage("network.list", tui.networks.Data(), true, false).
 		AddPage("errors", tui.errors.Data(), true, false).
-		SwitchToPage(tui.sm.Start().Id)
+		SwitchToPage(tui.sm.StartState().Id)
 
 	tui.menu = tui.newMenu(tui.status, []Info{tui.containers, tui.images, tui.networks, tui.errors})
 	tui.nav = tui.newNavigation()
 
-	layout := tview.NewFlex().SetDirection(tview.FlexRow).
+	layout := tview.NewFlex().
+		SetDirection(tview.FlexRow).
 		AddItem(tui.menu, 0, 1, false).
 		AddItem(tui.pages, 0, 5, false).
 		AddItem(tui.nav, 0, 1, false)

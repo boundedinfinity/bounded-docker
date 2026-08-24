@@ -6,14 +6,16 @@ import (
 	"github.com/rivo/tview"
 )
 
-func newInfo[T any](
+func newInfo[T any, O any](
 	tui *tui, title string, headers []string,
+	options O,
 	rowFn func(i int, item T) []string,
 	idFn func(item T) string,
 ) Info {
-	info := &info[T]{
+	info := &info[T, O]{
 		Title:   title,
 		Items:   []T{},
+		options: options,
 		headers: headers,
 		tui:     tui,
 		rowFunc: rowFn,
@@ -39,10 +41,11 @@ type Info interface {
 	Id() (string, bool)
 }
 
-type info[T any] struct {
+type info[T any, O any] struct {
 	Title    string
 	Items    []T
 	item     T
+	options  O
 	tui      *tui
 	headers  []string
 	header   *tview.TextView
@@ -54,7 +57,7 @@ type info[T any] struct {
 	zero     T
 }
 
-func (this *info[T]) Id() (string, bool) {
+func (this *info[T, O]) Id() (string, bool) {
 	row, _ := this.data.GetSelection()
 	idx := row - 1
 
@@ -67,19 +70,19 @@ func (this *info[T]) Id() (string, bool) {
 	return "", false
 }
 
-func (this *info[T]) Header() *tview.TextView {
+func (this *info[T, O]) Header() *tview.TextView {
 	return this.header
 }
 
-func (this *info[T]) Data() *tview.Table {
+func (this *info[T, O]) Data() *tview.Table {
 	return this.data
 }
 
-func (this *info[T]) Focus() {
+func (this *info[T, O]) Focus() {
 	this.tui.app.SetFocus(this.data)
 }
 
-func (this *info[T]) rows() ([][]string, int) {
+func (this *info[T, O]) rows() ([][]string, int) {
 	data := [][]string{this.headers}
 
 	for i, item := range this.Items {
@@ -89,7 +92,7 @@ func (this *info[T]) rows() ([][]string, int) {
 	return data, len(this.Items)
 }
 
-func (this *info[T]) Queue(items any) {
+func (this *info[T, O]) Queue(items any) {
 	this.tui.wg.Go(func() {
 		this.tui.app.QueueUpdateDraw(func() {
 			this.Update(items)
@@ -97,7 +100,7 @@ func (this *info[T]) Queue(items any) {
 	})
 }
 
-func (this *info[T]) Update(items any) {
+func (this *info[T, O]) Update(items any) {
 	switch v := any(items).(type) {
 	case T:
 		this.Set([]T{v})
@@ -108,7 +111,7 @@ func (this *info[T]) Update(items any) {
 	}
 }
 
-func (this *info[T]) Set(items []T) {
+func (this *info[T, O]) Set(items []T) {
 	this.Items = items
 	data, count := this.rows()
 

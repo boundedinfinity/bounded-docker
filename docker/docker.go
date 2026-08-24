@@ -12,35 +12,23 @@ const (
 )
 
 type System struct {
-	containers       *caller0[moby.ContainerListResult, moby.ContainerListOptions]
+	Containers       *caller0[moby.ContainerListResult, moby.ContainerListOptions]
 	containerInspect *caller1[moby.ContainerInspectResult, string, moby.ContainerInspectOptions]
 	containerLogs    *caller1[moby.ContainerLogsResult, string, moby.ContainerLogsOptions]
-	images           *caller0[moby.ImageListResult, moby.ImageListOptions]
-	networks         *caller0[moby.NetworkListResult, moby.NetworkListOptions]
+	Images           *caller0[moby.ImageListResult, moby.ImageListOptions]
+	Networks         *caller0[moby.NetworkListResult, moby.NetworkListOptions]
 	ErrCh            chan error
 	wg               *sync.WaitGroup
-	api              *moby.Client
+	Api              *moby.Client
 	ctx              context.Context
-}
-
-func (this *System) Containers() chan moby.ContainerListResult {
-	return this.containers.Out()
-}
-
-func (this *System) Images() chan moby.ImageListResult {
-	return this.images.Out()
-}
-
-func (this *System) Networks() chan moby.NetworkListResult {
-	return this.networks.Out()
 }
 
 func (this *System) Run() {
 	this.wg.Go(func() {
-		this.images.loop()
-		this.containers.loop()
-		this.networks.loop()
-		result := this.api.Events(this.ctx, moby.EventsListOptions{})
+		this.Images.loop()
+		this.Containers.loop()
+		this.Networks.loop()
+		result := this.Api.Events(this.ctx, moby.EventsListOptions{})
 
 		for {
 			select {
@@ -52,11 +40,11 @@ func (this *System) Run() {
 			case event := <-result.Messages:
 				switch event.Type {
 				case "container":
-					this.ListContainers()
+					this.Containers.Run(nil)
 				case "image":
-					this.ListImages()
+					this.Images.Run(nil)
 				case "network":
-					this.ListNetworks()
+					this.Networks.Run(nil)
 				}
 			}
 		}
@@ -65,18 +53,6 @@ func (this *System) Run() {
 
 func (this *System) Stop() {
 
-}
-
-func (this *System) ListContainers() {
-	this.containers.Run(nil)
-}
-
-func (this *System) ListImages() {
-	this.images.Run(nil)
-}
-
-func (this *System) ListNetworks() {
-	this.networks.Run(nil)
 }
 
 type logContext struct {

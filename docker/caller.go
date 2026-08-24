@@ -5,7 +5,8 @@ import (
 	"sync"
 )
 
-func newCaller0[T any, O any](wg *sync.WaitGroup, ctx context.Context, errCh chan error, options O, runFn func(context.Context, O) (T, error)) *caller0[T, O] {
+func newCaller0[T any, O any](wg *sync.WaitGroup, ctx context.Context, errCh chan error, runFn func(context.Context, O) (T, error)) *caller0[T, O] {
+	var options O
 	return &caller0[T, O]{
 		wg:      wg,
 		ctx:     ctx,

@@ -22,7 +22,7 @@ func Test_StateMachine_Creation_Default(t *testing.T) {
 	assert.Equal(t, "container.list", next.Id)
 
 	// up := tea.KeyPressMsg{Text: "j", Mod: 0, Code: 106, ShiftedCode: 0, BaseCode: 0, IsRepeat: false}
-	next, command := machine.Next("up")
+	next, commands := machine.Next("up")
 	assert.Equal(t, "container.list", next.Id)
-	assert.Equal(t, "line.up", command.Id)
+	assert.Equal(t, "line.up", commands[0].Id)
 }

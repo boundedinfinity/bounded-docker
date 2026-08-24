@@ -22,11 +22,11 @@ func New(wg *sync.WaitGroup, ctx context.Context) (*System, error) {
 	s := &System{
 		ErrCh:      errCh,
 		wg:         wg,
-		api:        api,
+		Api:        api,
 		ctx:        ctx,
-		containers: newCaller0(wg, ctx, errCh, moby.ContainerListOptions{All: true}, api.ContainerList),
-		images:     newCaller0(wg, ctx, errCh, moby.ImageListOptions{All: true}, api.ImageList),
-		networks:   newCaller0(wg, ctx, errCh, moby.NetworkListOptions{}, api.NetworkList),
+		Containers: newCaller0(wg, ctx, errCh, api.ContainerList),
+		Images:     newCaller0(wg, ctx, errCh, api.ImageList),
+		Networks:   newCaller0(wg, ctx, errCh, api.NetworkList),
 	}
 
 	return s, nil
