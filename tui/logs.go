@@ -79,7 +79,6 @@ func (this *logWriter) Write(p []byte) (int, error) {
 
 	// tview primitives must only be mutated from the event loop.
 	chunk := append([]byte(nil), p...)
-
 	done := make(chan struct{})
 
 	// Not tracked by the WaitGroup: QueueUpdateDraw never returns once the app has stopped.

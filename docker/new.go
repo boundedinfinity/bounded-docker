@@ -20,14 +20,15 @@ func New(wg *sync.WaitGroup, ctx context.Context) (*System, error) {
 	errCh := make(chan error)
 
 	s := &System{
-		ErrCh:         errCh,
-		wg:            wg,
-		Api:           api,
-		ctx:           ctx,
-		Containers:    newCaller0(wg, ctx, errCh, api.ContainerList),
-		Images:        newCaller0(wg, ctx, errCh, api.ImageList),
-		Networks:      newCaller0(wg, ctx, errCh, api.NetworkList),
-		ContainerLogs: newCaller1(wg, ctx, errCh, api.ContainerLogs),
+		ErrCh:            errCh,
+		wg:               wg,
+		Api:              api,
+		ctx:              ctx,
+		Containers:       newCaller0(wg, ctx, errCh, api.ContainerList),
+		Images:           newCaller0(wg, ctx, errCh, api.ImageList),
+		Networks:         newCaller0(wg, ctx, errCh, api.NetworkList),
+		ContainerLogs:    newCaller1(wg, ctx, errCh, api.ContainerLogs),
+		ContainerInspect: newCaller1(wg, ctx, errCh, api.ContainerInspect),
 	}
 
 	return s, nil

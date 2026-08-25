@@ -13,28 +13,31 @@ import (
 )
 
 type tui struct {
-	docker               *docker.System
-	ctx                  context.Context
-	cancel               context.CancelFunc
-	app                  *tview.Application
-	middle               *tview.Box
-	root                 tview.Primitive
-	containers           Info
-	containerOptions     moby.ContainerListOptions
-	containerLogs        *logs
-	containerLogsOptions moby.ContainerLogsOptions
-	images               Info
-	imageOptions         moby.ImageListOptions
-	networks             Info
-	errors               Info
-	sm                   *state.Machine
-	status               *tview.TextView
-	menu                 *tview.Flex
-	nav                  *tview.Pages
-	pages                *tview.Pages
-	current              string
-	screenWidth          int
-	wg                   *sync.WaitGroup
+	docker                  *docker.System
+	ctx                     context.Context
+	cancel                  context.CancelFunc
+	app                     *tview.Application
+	middle                  *tview.Box
+	root                    tview.Primitive
+	containers              Info
+	containerOptions        moby.ContainerListOptions
+	containerLogs           *logs
+	containerLogsOptions    moby.ContainerLogsOptions
+	containerInspect        *inspect
+	containerInspectOptions moby.ContainerInspectOptions
+	images                  Info
+	imageOptions            moby.ImageListOptions
+	networks                Info
+	errors                  Info
+	sm                      *state.Machine
+	status                  *tview.TextView
+	menu                    *tview.Flex
+	nav                     *tview.Pages
+	pages                   *tview.Pages
+	current                 string
+	screen                  tcell.Screen
+	screenWidth             int
+	wg                      *sync.WaitGroup
 }
 
 var (
@@ -42,15 +45,15 @@ var (
 	errTuiFn = errorer.Func(ErrTui)
 )
 
-func (_ tui) createPid(containerId string) string {
-	return "container.logs." + containerId
+func (_ tui) createPid(stateId, containerId string) string {
+	return stateId + "." + containerId
 }
 
 // openLogs replaces any running log stream with a fresh one for the given container.
 func (this *tui) openLogs(containerId string) {
 	if this.containerLogs != nil {
 		this.containerLogs.Stop()
-		this.pages.RemovePage(this.createPid(this.containerLogs.containerId))
+		this.pages.RemovePage(this.createPid("container.logs", this.containerLogs.containerId))
 		this.containerLogs = nil
 	}
 
@@ -60,12 +63,28 @@ func (this *tui) openLogs(containerId string) {
 		return
 	}
 
-	pid := this.createPid(containerId)
+	pid := this.createPid("container.logs", containerId)
 	view := newLogs(this, containerId, result)
 	this.containerLogs = view
 	this.pages.AddPage(pid, view.Data(), true, false)
 	this.pages.SwitchToPage(pid)
 	view.Start()
+}
+
+// openInspect shows an inspect view for the given container and requests its data.
+func (this *tui) openInspect(containerId string) {
+	if this.containerInspect != nil {
+		this.pages.RemovePage(this.createPid("container.inspect", this.containerInspect.containerId))
+		this.containerInspect = nil
+	}
+
+	pid := this.createPid("container.inspect", containerId)
+	view := newInspect(this, containerId)
+	this.containerInspect = view
+	this.pages.AddPage(pid, view.Data(), true, false)
+	this.pages.SwitchToPage(pid)
+
+	this.docker.ContainerInspect.Run(containerId, &this.containerInspectOptions)
 }
 
 func (this *tui) Run() error {
@@ -127,11 +146,34 @@ func (this *tui) Run() error {
 		})
 	}
 
-	if c, ok := this.sm.GetCommand("container.logs.follow"); ok {
+	if s, ok := this.sm.GetState("container.inspect"); ok {
+		s.AddEnterFunc(func(state *state.State) {
+			this.nav.SwitchToPage(state.Id)
+
+			if cid, ok := this.containers.Id(); ok {
+				this.openInspect(cid)
+			}
+		})
+	}
+
+	if c, ok := this.sm.GetCommand("container.inspect.size"); ok {
 		c.AddRunFunc(func(_ *state.State, _ *state.Command) {
-			this.containerLogsOptions.Follow = !this.containerLogsOptions.Follow
-			if id, ok := this.containers.Id(); ok {
-				this.docker.ContainerLogs.Run(id, &this.containerLogsOptions)
+			this.containerInspectOptions.Size = !this.containerInspectOptions.Size
+
+			if this.containerInspect != nil {
+				this.docker.ContainerInspect.Run(this.containerInspect.containerId, &this.containerInspectOptions)
+			}
+		})
+	}
+
+	if c, ok := this.sm.GetCommand("container.inspect.copy"); ok {
+		c.AddRunFunc(func(_ *state.State, _ *state.Command) {
+			if this.containerInspect == nil {
+				return
+			}
+
+			if value, ok := this.containerInspect.Value(); ok {
+				this.copyToClipboard(value)
 			}
 		})
 	}
@@ -155,6 +197,10 @@ func (this *tui) Run() error {
 				this.images.Queue(result.Items)
 			case result := <-this.docker.Networks.Out():
 				this.networks.Queue(result.Items)
+			case result := <-this.docker.ContainerInspect.Out():
+				if this.containerInspect != nil {
+					this.containerInspect.Set(result)
+				}
 			case err := <-this.docker.ErrCh:
 				this.errors.Queue(err)
 			}
@@ -189,8 +235,21 @@ func (this *tui) queueDraw(fn func()) {
 
 func (this *tui) handleRedraw(screen tcell.Screen) bool {
 	width, _ := screen.Size()
+	this.screen = screen
 	this.screenWidth = width
 	return false
+}
+
+// copyToClipboard posts text to the system clipboard via the terminal's OSC 52
+// support, which not every terminal honors.
+func (this *tui) copyToClipboard(text string) {
+	if this.screen == nil {
+		this.setStatus("clipboard unavailable")
+		return
+	}
+
+	this.screen.SetClipboard([]byte(text))
+	this.setStatusf("copied %d chars", len(text))
 }
 
 func (this *tui) handleInput(event *tcell.EventKey) *tcell.EventKey {

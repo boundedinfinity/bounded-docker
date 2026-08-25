@@ -14,7 +14,7 @@ const (
 type System struct {
 	Containers       *caller0[moby.ContainerListResult, moby.ContainerListOptions]
 	ContainerLogs    *caller1[moby.ContainerLogsResult, string, moby.ContainerLogsOptions]
-	containerInspect *caller1[moby.ContainerInspectResult, string, moby.ContainerInspectOptions]
+	ContainerInspect *caller1[moby.ContainerInspectResult, string, moby.ContainerInspectOptions]
 	Images           *caller0[moby.ImageListResult, moby.ImageListOptions]
 	Networks         *caller0[moby.NetworkListResult, moby.NetworkListOptions]
 	ErrCh            chan error
@@ -29,6 +29,7 @@ func (this *System) Run() {
 		this.Containers.loop()
 		this.Networks.loop()
 		this.ContainerLogs.Init()
+		this.ContainerInspect.Init()
 		result := this.Api.Events(this.ctx, moby.EventsListOptions{})
 
 		for {

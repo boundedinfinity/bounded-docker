@@ -38,18 +38,23 @@ func DefaultConfig() MachineConfig {
 				},
 				Transitions: map[string][]string{
 					"root":              {"r", "left", "h", "b", "esc"},
-					"container.details": {"d", "enter"},
-					"container.logs":    {"l"},
+					"container.inspect": {"i"},
+					"container.logs":    {"l", "enter"},
 				},
 			},
-			"container.details": {
-				Name: "Container Details",
+			"container.inspect": {
+				Name: "Inspect",
 				Transitions: map[string][]string{
 					"root":           {"r"},
-					"container.list": {"c", "left", "h", "b", "esc"},
+					"container.list": {"left", "h", "b", "esc"},
+					"container.logs": {"l"},
 				},
 				Commands: map[string][]string{
-					"quit": {"[command]"},
+					"container.inspect.size": {"s"},
+					"container.inspect.copy": {"c"},
+					"line.up":                {"up", "j"},
+					"line.down":              {"down", "k"},
+					"quit":                   {"[command]"},
 				},
 			},
 			"container.logs": {
@@ -70,10 +75,10 @@ func DefaultConfig() MachineConfig {
 					"image.details": {"d", "enter"},
 				},
 				Commands: map[string][]string{
-					"up":             {"up", "j"},
-					"down":           {"down", "k"},
-					"image.list.all": {"a"},
 					"quit":           {},
+					"line.up":        {"up", "j"},
+					"line.down":      {"down", "k"},
+					"image.list.all": {"a"},
 				},
 			},
 			"image.details": {
@@ -123,13 +128,19 @@ func DefaultConfig() MachineConfig {
 				Keys: []string{"down", "k"},
 			},
 			"container.list.all": {
-				Name: "List All Containers",
+				Name: "Toggle List All Containers",
 			},
 			"container.logs.follow": {
 				Name: "Follow Container Logs",
 			},
+			"container.inspect.size": {
+				Name: "Toggle Filesystem Size",
+			},
+			"container.inspect.copy": {
+				Name: "Copy Value to Clipboard",
+			},
 			"image.list.all": {
-				Name: "List All Images",
+				Name: "Toggle List All Images",
 			},
 			"errors.copy": {
 				Name: "Copy error to clipboard",

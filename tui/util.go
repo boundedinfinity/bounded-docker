@@ -3,6 +3,8 @@ package tui
 import (
 	"fmt"
 	"math"
+	"net/netip"
+	"sort"
 	"strings"
 	"time"
 
@@ -10,6 +12,7 @@ import (
 	"github.com/flosch/go-humanize"
 	"github.com/gdamore/tcell/v2"
 	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/network"
 	"github.com/rivo/tview"
 )
 
@@ -27,6 +30,59 @@ type utils struct {
 	Container containerUtils
 	Network   networkUtils
 	Image     imageUtils
+	Inspect   inspectUtils
+}
+
+// /////////////////////////////////////////////////////////////////////////////////////////////////
+
+type inspectUtils struct{}
+
+func (_ inspectUtils) env2Str(env []string) string {
+	return strings.Join(env, "\n")
+}
+
+// flatten turns decoded JSON into sorted key/value pairs using dotted paths.
+func (this inspectUtils) flatten(prefix string, value any, rows *[][2]string) {
+	switch v := value.(type) {
+	case map[string]any:
+		if len(v) == 0 {
+			*rows = append(*rows, [2]string{prefix, "{}"})
+			return
+		}
+
+		keys := make([]string, 0, len(v))
+
+		for k := range v {
+			keys = append(keys, k)
+		}
+
+		sort.Strings(keys)
+
+		for _, k := range keys {
+			this.flatten(this.join(prefix, k), v[k], rows)
+		}
+	case []any:
+		if len(v) == 0 {
+			*rows = append(*rows, [2]string{prefix, "[]"})
+			return
+		}
+
+		for i, item := range v {
+			this.flatten(fmt.Sprintf("%s[%d]", prefix, i), item, rows)
+		}
+	case nil:
+		*rows = append(*rows, [2]string{prefix, ""})
+	default:
+		*rows = append(*rows, [2]string{prefix, fmt.Sprint(v)})
+	}
+}
+
+func (_ inspectUtils) join(prefix, key string) string {
+	if prefix == "" {
+		return key
+	}
+
+	return prefix + "." + key
 }
 
 // /////////////////////////////////////////////////////////////////////////////////////////////////
@@ -70,6 +126,67 @@ func (_ dockerUtils) ports2Str(ports []container.PortSummary) string {
 
 func (_ dockerUtils) repoTags2Str(tags []string) string {
 	return strings.Join(tags, "\n")
+}
+
+func (_ dockerUtils) map2Lines(values map[string]string) []string {
+	lines := make([]string, 0, len(values))
+
+	for k, v := range values {
+		lines = append(lines, fmt.Sprintf("%s=%s", k, v))
+	}
+
+	sort.Strings(lines)
+	return lines
+}
+
+func (_ dockerUtils) volumes2Lines(volumes map[string]struct{}) []string {
+	lines := make([]string, 0, len(volumes))
+
+	for k := range volumes {
+		lines = append(lines, k)
+	}
+
+	sort.Strings(lines)
+	return lines
+}
+
+func (_ dockerUtils) addrs2Lines(addrs []netip.Addr) []string {
+	lines := make([]string, 0, len(addrs))
+
+	for _, addr := range addrs {
+		lines = append(lines, addr.String())
+	}
+
+	return lines
+}
+
+func (_ dockerUtils) exposedPorts2Lines(ports network.PortSet) []string {
+	lines := make([]string, 0, len(ports))
+
+	for port := range ports {
+		lines = append(lines, port.String())
+	}
+
+	sort.Strings(lines)
+	return lines
+}
+
+func (_ dockerUtils) portMap2Lines(ports network.PortMap) []string {
+	lines := make([]string, 0, len(ports))
+
+	for port, bindings := range ports {
+		if len(bindings) == 0 {
+			lines = append(lines, port.String())
+			continue
+		}
+
+		for _, binding := range bindings {
+			lines = append(lines, fmt.Sprintf("%s:%s->%s", binding.HostIP, binding.HostPort, port))
+		}
+	}
+
+	sort.Strings(lines)
+	return lines
 }
 
 // /////////////////////////////////////////////////////////////////////////////////////////////////
@@ -156,6 +273,18 @@ func (_ utils) index2Str(i int) string {
 // /////////////////////////////////////////////////////////////////////////////////////////////////
 
 type tviewUtils struct{}
+
+func (_ tviewUtils) multiRow(title string, lines ...string) [][2]string {
+	if len(lines) == 0 {
+		return [][2]string{{title, ""}}
+	}
+
+	rows := [][2]string{{title, lines[0]}}
+	for _, line := range lines[1:] {
+		rows = append(rows, [2]string{"", line})
+	}
+	return rows
+}
 
 func (_ tviewUtils) tcellEvent2Str(event *tcell.EventKey) string {
 	key := string(event.Name())

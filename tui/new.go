@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/boundedinfinity/docker-tui/docker"
@@ -20,7 +21,14 @@ func New(wg *sync.WaitGroup, ctx context.Context, cancel context.CancelFunc, sm 
 		app:    app,
 		sm:     sm,
 		cancel: cancel,
-		root:   tview.NewTextView().SetText("Welcome"),
+		root: newWelcome(
+			"Use the navigation items below to view:",
+			"",
+			"  - Containers",
+			"  - Images",
+			"  - Networks",
+			"  - Errors",
+		),
 		status: tview.NewTextView().SetText("Welcome"),
 		wg:     wg,
 		containerLogsOptions: moby.ContainerLogsOptions{
@@ -65,6 +73,33 @@ func New(wg *sync.WaitGroup, ctx context.Context, cancel context.CancelFunc, sm 
 	tui.app.SetFocus(tui.pages)
 
 	return tui
+}
+
+// newWelcome centers a left-aligned block of text within the available space.
+func newWelcome(lines ...string) tview.Primitive {
+	view := tview.NewTextView().
+		SetTextAlign(tview.AlignLeft).
+		SetText(strings.Join(lines, "\n"))
+
+	width := 0
+
+	for _, line := range lines {
+		if w := tview.TaggedStringWidth(line); w > width {
+			width = w
+		}
+	}
+
+	block := tview.NewFlex().
+		SetDirection(tview.FlexRow).
+		AddItem(nil, 0, 1, false).
+		AddItem(view, len(lines), 0, false).
+		AddItem(nil, 0, 1, false)
+
+	return tview.NewFlex().
+		SetDirection(tview.FlexColumn).
+		AddItem(nil, 0, 1, false).
+		AddItem(block, width, 0, false).
+		AddItem(nil, 0, 1, false)
 }
 
 func (this *tui) newNavigation() *tview.Pages {
