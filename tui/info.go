@@ -29,6 +29,9 @@ func newInfo[T any, O any](
 		SetFixed(1, len(headers)).
 		SetEvaluateAllRows(true).
 		SetSelectable(true, false)
+
+	info.Set([]T{})
+
 	return info
 }
 
@@ -101,10 +104,8 @@ func (this *info[T, O]) rows() ([][]string, int) {
 }
 
 func (this *info[T, O]) Queue(items any) {
-	this.tui.wg.Go(func() {
-		this.tui.app.QueueUpdateDraw(func() {
-			this.Update(items)
-		})
+	this.tui.queueDraw(func() {
+		this.Update(items)
 	})
 }
 

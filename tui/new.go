@@ -81,20 +81,16 @@ func (this *tui) newNavigation() *tview.Pages {
 }
 
 func (this *tui) setStatus(text string) {
-	this.wg.Go(func() {
-		this.app.QueueUpdateDraw(func() {
-			this.status.Clear()
-			fmt.Fprint(this.status, text)
-		})
+	this.queueDraw(func() {
+		this.status.Clear()
+		fmt.Fprint(this.status, text)
 	})
 }
 
 func (this *tui) setStatusf(format string, a ...any) {
-	this.wg.Go(func() {
-		this.app.QueueUpdateDraw(func() {
-			this.status.Clear()
-			fmt.Fprintf(this.status, format, a...)
-		})
+	this.queueDraw(func() {
+		this.status.Clear()
+		fmt.Fprintf(this.status, format, a...)
 	})
 }
 

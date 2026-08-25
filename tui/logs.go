@@ -44,12 +44,15 @@ func (this *logs) Start() {
 	this.tui.wg.Go(func() {
 		defer this.cancel()
 
-		w := &logWriter{tui: this.tui, view: this.view}
+		w := &logWriter{tui: this.tui, view: this.view, ctx: this.ctx}
 
 		// StdCopy blocks until the stream ends, forwarding each chunk as it arrives.
 		if _, err := stdcopy.StdCopy(w, w, this.result); err != nil {
 			if this.ctx.Err() == nil && !errors.Is(err, io.EOF) {
-				this.tui.docker.ErrCh <- err
+				select {
+				case this.tui.docker.ErrCh <- err:
+				case <-this.ctx.Done():
+				}
 			}
 		}
 	})
@@ -64,16 +67,34 @@ func (this *logs) Stop() {
 type logWriter struct {
 	tui  *tui
 	view *tview.TextView
+	ctx  context.Context
 }
 
+var errLogsClosed = errors.New("log stream closed")
+
 func (this *logWriter) Write(p []byte) (int, error) {
+	if this.ctx.Err() != nil {
+		return 0, errLogsClosed
+	}
+
 	// tview primitives must only be mutated from the event loop.
 	chunk := append([]byte(nil), p...)
 
-	this.tui.app.QueueUpdateDraw(func() {
-		this.view.Write(chunk)
-		this.view.ScrollToEnd()
-	})
+	done := make(chan struct{})
 
-	return len(p), nil
+	// Not tracked by the WaitGroup: QueueUpdateDraw never returns once the app has stopped.
+	go func() {
+		defer close(done)
+		this.tui.app.QueueUpdateDraw(func() {
+			this.view.Write(chunk)
+			this.view.ScrollToEnd()
+		})
+	}()
+
+	select {
+	case <-done:
+		return len(p), nil
+	case <-this.ctx.Done():
+		return 0, errLogsClosed
+	}
 }

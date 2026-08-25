@@ -167,10 +167,24 @@ func (this *tui) Run() error {
 	return this.app.Run()
 }
 
-func (t *tui) Stop() {
-	if t.app != nil {
-		t.app.Stop()
+func (this *tui) Stop() {
+	if this.cancel != nil {
+		this.cancel()
 	}
+
+	if this.app != nil {
+		this.app.Stop()
+	}
+}
+
+// queueDraw applies fn on the event loop. It is deliberately not tracked by the
+// WaitGroup because QueueUpdateDraw never returns once the app has stopped.
+func (this *tui) queueDraw(fn func()) {
+	if this.ctx.Err() != nil {
+		return
+	}
+
+	go this.app.QueueUpdateDraw(fn)
 }
 
 func (this *tui) handleRedraw(screen tcell.Screen) bool {

@@ -41,9 +41,17 @@ func (this *caller0[T, O]) loop() {
 
 				if this.runFn != nil {
 					if result, err := this.runFn(this.ctx, this.options); err == nil {
-						this.outCh <- result
+						select {
+						case this.outCh <- result:
+						case <-this.ctx.Done():
+							return
+						}
 					} else {
-						this.errCh <- err
+						select {
+						case this.errCh <- err:
+						case <-this.ctx.Done():
+							return
+						}
 					}
 				}
 			}
@@ -59,7 +67,12 @@ func (this *caller0[T, O]) Out() chan T {
 }
 
 func (this *caller0[T, O]) Run(options *O) {
-	this.wg.Go(func() { this.runCh <- options })
+	this.wg.Go(func() {
+		select {
+		case this.runCh <- options:
+		case <-this.ctx.Done():
+		}
+	})
 }
 
 // /////////////////////////////////////////////////////////////////////////////////////////////////
@@ -105,9 +118,17 @@ func (this *caller1[T, A, O]) Init() {
 
 				if this.runFn != nil {
 					if result, err := this.runFn(this.ctx, args.arg1, this.options); err == nil {
-						this.outCh <- result
+						select {
+						case this.outCh <- result:
+						case <-this.ctx.Done():
+							return
+						}
 					} else {
-						this.errCh <- err
+						select {
+						case this.errCh <- err:
+						case <-this.ctx.Done():
+							return
+						}
 					}
 				}
 			}
@@ -123,5 +144,10 @@ func (this *caller1[T, A, O]) Out() chan T {
 }
 
 func (this *caller1[T, A, O]) Run(arg1 A, options *O) {
-	this.wg.Go(func() { this.runCh <- args1[A, O]{arg1: arg1, options: options} })
+	this.wg.Go(func() {
+		select {
+		case this.runCh <- args1[A, O]{arg1: arg1, options: options}:
+		case <-this.ctx.Done():
+		}
+	})
 }

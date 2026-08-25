@@ -83,6 +83,13 @@ func (_ stringUtils) padRight(text string, width int) string {
 	return text + padding
 }
 
+func (_ stringUtils) padLeft(text string, width int) string {
+	width = max(width, len(text))
+	size := width - len(text)
+	padding := strings.Repeat(" ", size)
+	return padding + text
+}
+
 func (_ stringUtils) pad(text string, width int) string {
 	width = max(width, len(text))
 	size := width - len(text)
@@ -120,7 +127,6 @@ func (_ stringUtils) calcMax(rows [][]string) int {
 		}
 	}
 
-	width += 10
 	return width
 }
 
@@ -162,20 +168,22 @@ func (_ tviewUtils) tcellEvent2Str(event *tcell.EventKey) string {
 
 func (_ tviewUtils) state2Rows(state *state.State) [][]string {
 	rows := [][]string{}
-	row := []string{}
+	row := []string{"Transistions:"}
 
 	for _, transistion := range state.Transitions {
 		var keys []string
+
 		for _, key := range transistion.Keys {
 			keys = append(keys, key.Name)
 		}
 
-		text := fmt.Sprintf("%s › %s", strings.Join(keys, "/"), transistion.State.Name)
-		row = append(row, text)
+		col1 := fmt.Sprintf("%s", strings.Join(keys, "/"))
+		col2 := fmt.Sprintf("› %s", transistion.State.Name)
+		row = append(row, col1, col2)
 	}
 
 	rows = append(rows, row)
-	row = []string{}
+	row = []string{"    Commands:"}
 
 	for _, command := range state.Commands {
 		var keys []string
@@ -184,8 +192,9 @@ func (_ tviewUtils) state2Rows(state *state.State) [][]string {
 			keys = append(keys, key.Name)
 		}
 
-		text := fmt.Sprintf("%s › %s", strings.Join(keys, "/"), command.Command.Name)
-		row = append(row, text)
+		col1 := fmt.Sprintf("%s", strings.Join(keys, "/"))
+		col2 := fmt.Sprintf("› %s", command.Command.Name)
+		row = append(row, col1, col2)
 	}
 
 	rows = append(rows, row)
@@ -194,20 +203,30 @@ func (_ tviewUtils) state2Rows(state *state.State) [][]string {
 
 func (_ tviewUtils) state2Table(state *state.State) *tview.Table {
 	rows := Utils.Tview.state2Rows(state)
-	width := Utils.String.calcMax(rows) + 5
+	width := Utils.String.calcMax(rows) / 2
 
 	table := tview.NewTable()
-	// .SetBorders(true)
-	table.SetBorderPadding(1, 1, 1, 1)
+	table.SetBorderPadding(0, 0, 1, 1)
 
 	for r, row := range rows {
 		for c, text := range row {
-			text = Utils.String.padRight(text, width)
+			if c%2 == 0 {
+				text = Utils.String.padRight(text, width)
+			} else {
+				text = Utils.String.padLeft(text, width)
+			}
+
 			cell := tview.NewTableCell(text).
 				SetTextColor(tcell.ColorWhite).
-				SetAlign(tview.AlignCenter).
 				SetSelectable(false)
-				// SetBackgroundColor(tcell.ColorDarkGray)
+
+			if c%2 == 0 {
+				cell.SetAlign(tview.AlignLeft)
+			} else {
+				cell.SetTextColor(tcell.ColorYellow)
+				cell.SetAlign(tview.AlignRight)
+			}
+
 			table.SetCell(r, c, cell)
 		}
 	}

@@ -37,9 +37,8 @@ func main() {
 
 	tui := tui.New(wg, ctx, cancel, machine, d)
 	wg.Go(func() {
-		if err = tui.Run(); err != nil {
-			cancel()
-		}
+		defer cancel()
+		err = tui.Run()
 	})
 
 	go func() {
