@@ -39,6 +39,7 @@ func DefaultConfig() MachineConfig {
 				Transitions: map[string][]string{
 					"root":              {"r", "left", "h", "b", "esc"},
 					"container.details": {"d", "enter"},
+					"container.logs":    {"l"},
 				},
 			},
 			"container.details": {
@@ -51,6 +52,17 @@ func DefaultConfig() MachineConfig {
 					"quit": {"[command]"},
 				},
 			},
+			"container.logs": {
+				Name: "Container Logs",
+				Transitions: map[string][]string{
+					"root":           {"r"},
+					"container.list": {"c", "left", "h", "b", "esc"},
+				},
+				Commands: map[string][]string{
+					"container.logs.follow": {"f"},
+					"quit":                  {"[command]"},
+				},
+			},
 			"image.list": {
 				Name: "Images",
 				Transitions: map[string][]string{
@@ -58,9 +70,10 @@ func DefaultConfig() MachineConfig {
 					"image.details": {"d", "enter"},
 				},
 				Commands: map[string][]string{
-					"up":   {"up", "j"},
-					"down": {"down", "k"},
-					"quit": {},
+					"up":             {"up", "j"},
+					"down":           {"down", "k"},
+					"image.list.all": {"a"},
+					"quit":           {},
 				},
 			},
 			"image.details": {
@@ -111,6 +124,12 @@ func DefaultConfig() MachineConfig {
 			},
 			"container.list.all": {
 				Name: "List All Containers",
+			},
+			"container.logs.follow": {
+				Name: "Follow Container Logs",
+			},
+			"image.list.all": {
+				Name: "List All Images",
 			},
 			"errors.copy": {
 				Name: "Copy error to clipboard",

@@ -23,6 +23,12 @@ func New(wg *sync.WaitGroup, ctx context.Context, cancel context.CancelFunc, sm 
 		root:   tview.NewTextView().SetText("Welcome"),
 		status: tview.NewTextView().SetText("Welcome"),
 		wg:     wg,
+		containerLogsOptions: moby.ContainerLogsOptions{
+			ShowStdout: true,
+			ShowStderr: true,
+			Follow:     true,
+			Tail:       "500",
+		},
 	}
 
 	tui.containers = newInfo(tui, "Containers", Utils.Container.titles(),

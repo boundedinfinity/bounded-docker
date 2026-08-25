@@ -42,29 +42,37 @@ type Info interface {
 }
 
 type info[T any, O any] struct {
-	Title    string
-	Items    []T
-	item     T
-	options  O
-	tui      *tui
-	headers  []string
-	header   *tview.TextView
-	data     *tview.Table
-	idFunc   func(T) string
-	rowFunc  func(int, T) []string
-	initFunc func()
-	colWidth int
-	zero     T
+	Title       string
+	Items       []T
+	item        T
+	options     O
+	tui         *tui
+	headers     []string
+	header      *tview.TextView
+	data        *tview.Table
+	idFunc      func(T) string
+	rowFunc     func(int, T) []string
+	initFunc    func()
+	colWidth    int
+	zero        T
+	selectedRow int
+	selectedId  string
 }
 
 func (this *info[T, O]) Id() (string, bool) {
 	row, _ := this.data.GetSelection()
+
+	if row == this.selectedRow {
+		return this.selectedId, this.selectedId != ""
+	}
+
 	idx := row - 1
 
 	if this.idFunc != nil && idx >= 0 && idx < len(this.Items) {
+		this.selectedRow = row
 		item := this.Items[idx]
-		id := this.idFunc(item)
-		return id, id != ""
+		this.selectedId = this.idFunc(item)
+		return this.selectedId, this.selectedId != ""
 	}
 
 	return "", false

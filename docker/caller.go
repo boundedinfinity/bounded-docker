@@ -62,18 +62,15 @@ func (this *caller0[T, O]) Run(options *O) {
 	this.wg.Go(func() { this.runCh <- options })
 }
 
-func (this *caller0[T, O]) Send(result T) {
-	this.wg.Go(func() { this.outCh <- result })
-}
-
 // /////////////////////////////////////////////////////////////////////////////////////////////////
 
 type args1[A any, O any] struct {
-	args    A
+	arg1    A
 	options *O
 }
 
-func newCaller1[T any, A any, O any](wg *sync.WaitGroup, ctx context.Context, errCh chan error, options O, runFn func(context.Context, A, O) (T, error)) *caller1[T, A, O] {
+func newCaller1[T any, A any, O any](wg *sync.WaitGroup, ctx context.Context, errCh chan error, runFn func(context.Context, A, O) (T, error)) *caller1[T, A, O] {
+	var options O
 	return &caller1[T, A, O]{
 		wg:      wg,
 		ctx:     ctx,
@@ -107,7 +104,7 @@ func (this *caller1[T, A, O]) Init() {
 				}
 
 				if this.runFn != nil {
-					if result, err := this.runFn(this.ctx, args.args, this.options); err == nil {
+					if result, err := this.runFn(this.ctx, args.arg1, this.options); err == nil {
 						this.outCh <- result
 					} else {
 						this.errCh <- err
@@ -126,9 +123,5 @@ func (this *caller1[T, A, O]) Out() chan T {
 }
 
 func (this *caller1[T, A, O]) Run(arg1 A, options *O) {
-	this.wg.Go(func() { this.runCh <- args1[A, O]{args: arg1, options: options} })
-}
-
-func (this *caller1[T, A, O]) Send(result T) {
-	this.wg.Go(func() { this.outCh <- result })
+	this.wg.Go(func() { this.runCh <- args1[A, O]{arg1: arg1, options: options} })
 }

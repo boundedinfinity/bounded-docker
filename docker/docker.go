@@ -13,8 +13,8 @@ const (
 
 type System struct {
 	Containers       *caller0[moby.ContainerListResult, moby.ContainerListOptions]
+	ContainerLogs    *caller1[moby.ContainerLogsResult, string, moby.ContainerLogsOptions]
 	containerInspect *caller1[moby.ContainerInspectResult, string, moby.ContainerInspectOptions]
-	containerLogs    *caller1[moby.ContainerLogsResult, string, moby.ContainerLogsOptions]
 	Images           *caller0[moby.ImageListResult, moby.ImageListOptions]
 	Networks         *caller0[moby.NetworkListResult, moby.NetworkListOptions]
 	ErrCh            chan error
@@ -28,6 +28,7 @@ func (this *System) Run() {
 		this.Images.loop()
 		this.Containers.loop()
 		this.Networks.loop()
+		this.ContainerLogs.Init()
 		result := this.Api.Events(this.ctx, moby.EventsListOptions{})
 
 		for {
@@ -40,7 +41,12 @@ func (this *System) Run() {
 			case event := <-result.Messages:
 				switch event.Type {
 				case "container":
-					this.Containers.Run(nil)
+					switch event.Action {
+					case "start", "restart", "unpause":
+						this.Containers.Run(nil)
+					case "stop", "kill", "pause", "die":
+						this.Containers.Run(nil)
+					}
 				case "image":
 					this.Images.Run(nil)
 				case "network":
@@ -52,28 +58,7 @@ func (this *System) Run() {
 }
 
 func (this *System) Stop() {
-
-}
-
-type logContext struct {
-	result moby.ContainerLogsResult
-	cancel context.CancelFunc
-}
-
-func (this *System) GetLogs(id string) {
-	// this.wg.Go(func() {
-	// 	o := client.ContainerLogsOptions{
-	// 		ShowStdout: true,
-	// 		ShowStderr: true,
-	// 		Follow:     true,
-	// 	}
-
-	// 	ctx, cancel := context.WithCancel(this.ctx)
-
-	// 	if result, err := this.api.ContainerLogs(ctx, id, o); err == nil {
-	// 		// go func() { this.lo <- result.Items }()
-	// 	} else {
-	// 		go func() { this.ErrCh <- err }()
-	// 	}
-	// })
+	if this.Api != nil {
+		this.Api.Close()
+	}
 }
