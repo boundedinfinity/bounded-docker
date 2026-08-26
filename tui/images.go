@@ -23,6 +23,18 @@ func (_ imageUtils) summary2row(i int, summary image.Summary) []string {
 	}
 }
 
+func (_ imageUtils) summary2rows(summary image.Summary) [][]string {
+	rows := [][]string{{"#", "Key", "Value"}}
+	index := 1
+
+	rows, index = Utils.Tview.multiRowi(rows, index, "ID", summary.ID)
+	rows, index = Utils.Tview.multiRowi(rows, index, "Repository Tags", summary.RepoTags...)
+	rows, index = Utils.Tview.multiRowi(rows, index, "Size", Utils.size2Str(summary.Size))
+	rows, index = Utils.Tview.multiRowi(rows, index, "Repository Digests", summary.RepoDigests...)
+
+	return rows
+}
+
 func (_ imageUtils) fake() []image.Summary {
 	return []image.Summary{}
 

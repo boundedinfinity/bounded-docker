@@ -290,15 +290,35 @@ func (_ utils) index2Str(i int) string {
 
 type tviewUtils struct{}
 
-func (_ tviewUtils) multiRow(title string, lines ...string) [][2]string {
-	if len(lines) == 0 {
-		return [][2]string{{title, ""}}
+func (_ tviewUtils) multiRowi(rows [][]string, index int, title string, lines ...string) ([][]string, int) {
+	next := func() string {
+		s := Utils.index2Str(index)
+		index++
+		return s
 	}
 
-	rows := [][2]string{{title, lines[0]}}
-	for _, line := range lines[1:] {
-		rows = append(rows, [2]string{"", line})
+	if len(lines) == 0 {
+		return append(rows, []string{next(), title, ""}), index
 	}
+
+	rows = append(rows, []string{next(), title, lines[0]})
+	for _, line := range lines[1:] {
+		rows = append(rows, []string{next(), "", line})
+	}
+
+	return rows, index
+}
+
+func (_ tviewUtils) multiRow(rows [][]string, title string, lines ...string) [][]string {
+	if len(lines) == 0 {
+		return append(rows, []string{title, ""})
+	}
+
+	rows = append(rows, []string{title, lines[0]})
+	for _, line := range lines[1:] {
+		rows = append(rows, []string{"", line})
+	}
+
 	return rows
 }
 

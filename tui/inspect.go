@@ -12,12 +12,11 @@ import (
 func newInspect(tui *tui, id string) *inspect {
 	inspect := &inspect{
 		tui: tui, containerId: id,
-		headers: [2]string{"Key", "Value"},
 	}
 
 	inspect.view = tview.NewTable().
 		SetBorders(true).
-		SetFixed(1, len(inspect.headers)).
+		SetFixed(1, 3).
 		SetEvaluateAllRows(true).
 		SetSelectable(true, false)
 	inspect.view.SetBorder(true).SetTitle(" [ Inspect: " + id + " ] ")
@@ -27,9 +26,8 @@ func newInspect(tui *tui, id string) *inspect {
 
 type inspect struct {
 	tui         *tui
-	headers     [2]string
 	view        *tview.Table
-	rows        [][2]string
+	rows        [][]string
 	containerId string
 }
 
@@ -51,14 +49,11 @@ func (this *inspect) Value() (string, bool) {
 
 func (this *inspect) Set(result moby.ContainerInspectResult) {
 	container := result.Container
-	rows := [][2]string{this.headers}
+	rows := [][]string{}
+	index := 0
 
-	add := func(key, value string) {
-		rows = append(rows, [2]string{key, value})
-	}
-
-	addMulti := func(key string, values ...string) {
-		rows = append(rows, Utils.Tview.multiRow(key, values...)...)
+	add := func(key string, values ...string) {
+		rows, index = Utils.Tview.multiRowi(rows, index, key, values...)
 	}
 
 	add("Id", container.ID)
@@ -68,7 +63,7 @@ func (this *inspect) Set(result moby.ContainerInspectResult) {
 	add("Platform", container.Platform)
 	add("Driver", container.Driver)
 	add("Path", container.Path)
-	addMulti("Args", container.Args...)
+	add("Args", container.Args...)
 	add("RestartCount", strconv.Itoa(container.RestartCount))
 	add("MountLabel", container.MountLabel)
 	add("ProcessLabel", container.ProcessLabel)
@@ -77,7 +72,7 @@ func (this *inspect) Set(result moby.ContainerInspectResult) {
 	add("HostnamePath", container.HostnamePath)
 	add("HostsPath", container.HostsPath)
 	add("LogPath", container.LogPath)
-	addMulti("ExecIDs", container.ExecIDs...)
+	add("ExecIDs", container.ExecIDs...)
 
 	// Only populated when ContainerInspectOptions.Size is set.
 	if container.SizeRw != nil {
@@ -121,14 +116,14 @@ func (this *inspect) Set(result moby.ContainerInspectResult) {
 		add("Config.AttachStderr", strconv.FormatBool(config.AttachStderr))
 		add("Config.NetworkDisabled", strconv.FormatBool(config.NetworkDisabled))
 		add("Config.StopSignal", config.StopSignal)
-		addMulti("Config.Env", config.Env...)
-		addMulti("Config.Cmd", config.Cmd...)
-		addMulti("Config.Entrypoint", config.Entrypoint...)
-		addMulti("Config.Shell", config.Shell...)
-		addMulti("Config.OnBuild", config.OnBuild...)
-		addMulti("Config.Labels", Utils.Docker.map2Lines(config.Labels)...)
-		addMulti("Config.Volumes", Utils.Docker.volumes2Lines(config.Volumes)...)
-		addMulti("Config.ExposedPorts", Utils.Docker.exposedPorts2Lines(config.ExposedPorts)...)
+		add("Config.Env", config.Env...)
+		add("Config.Cmd", config.Cmd...)
+		add("Config.Entrypoint", config.Entrypoint...)
+		add("Config.Shell", config.Shell...)
+		add("Config.OnBuild", config.OnBuild...)
+		add("Config.Labels", Utils.Docker.map2Lines(config.Labels)...)
+		add("Config.Volumes", Utils.Docker.volumes2Lines(config.Volumes)...)
+		add("Config.ExposedPorts", Utils.Docker.exposedPorts2Lines(config.ExposedPorts)...)
 
 		if config.StopTimeout != nil {
 			add("Config.StopTimeout", strconv.Itoa(*config.StopTimeout))
@@ -141,10 +136,10 @@ func (this *inspect) Set(result moby.ContainerInspectResult) {
 		add("HostConfig.Privileged", strconv.FormatBool(host.Privileged))
 		add("HostConfig.AutoRemove", strconv.FormatBool(host.AutoRemove))
 		add("HostConfig.ReadonlyRootfs", strconv.FormatBool(host.ReadonlyRootfs))
-		addMulti("HostConfig.Binds", host.Binds...)
-		addMulti("HostConfig.CapAdd", host.CapAdd...)
-		addMulti("HostConfig.CapDrop", host.CapDrop...)
-		addMulti("HostConfig.Dns", Utils.Docker.addrs2Lines(host.DNS)...)
+		add("HostConfig.Binds", host.Binds...)
+		add("HostConfig.CapAdd", host.CapAdd...)
+		add("HostConfig.CapDrop", host.CapDrop...)
+		add("HostConfig.Dns", Utils.Docker.addrs2Lines(host.DNS)...)
 		add("HostConfig.Memory", Utils.size2Str(host.Memory))
 		add("HostConfig.CpuShares", strconv.FormatInt(host.CPUShares, 10))
 	}
@@ -164,7 +159,7 @@ func (this *inspect) Set(result moby.ContainerInspectResult) {
 	if settings := container.NetworkSettings; settings != nil {
 		add("NetworkSettings.SandboxID", settings.SandboxID)
 		add("NetworkSettings.SandboxKey", settings.SandboxKey)
-		addMulti("NetworkSettings.Ports", Utils.Docker.portMap2Lines(settings.Ports)...)
+		add("NetworkSettings.Ports", Utils.Docker.portMap2Lines(settings.Ports)...)
 
 		names := make([]string, 0, len(settings.Networks))
 
@@ -186,13 +181,13 @@ func (this *inspect) Set(result moby.ContainerInspectResult) {
 			add(prefix+".Gateway", endpoint.Gateway.String())
 			add(prefix+".IPAddress", endpoint.IPAddress.String())
 			add(prefix+".MacAddress", endpoint.MacAddress.String())
-			addMulti(prefix+".Aliases", endpoint.Aliases...)
+			add(prefix+".Aliases", endpoint.Aliases...)
 		}
 	}
 
 	if driver := container.GraphDriver; driver != nil {
 		add("GraphDriver.Name", driver.Name)
-		addMulti("GraphDriver.Data", Utils.Docker.map2Lines(driver.Data)...)
+		add("GraphDriver.Data", Utils.Docker.map2Lines(driver.Data)...)
 	}
 
 	this.tui.queueDraw(func() {
