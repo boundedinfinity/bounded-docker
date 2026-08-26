@@ -193,6 +193,22 @@ func (_ dockerUtils) portMap2Lines(ports network.PortMap) []string {
 
 type stringUtils struct{}
 
+func (this stringUtils) fixed(text string, width int, suffix string) string {
+	if len(text) > width {
+		text = this.truncateString(text, width, suffix)
+	}
+
+	if len(text) < width {
+		text = this.pad(text, width)
+	}
+
+	return text
+}
+
+func (this stringUtils) fixedFn(width int, suffix string) func(string) string {
+	return func(text string) string { return this.fixed(text, width, suffix) }
+}
+
 func (_ stringUtils) padRight(text string, width int) string {
 	width = max(width, len(text))
 	size := width - len(text)
@@ -217,22 +233,22 @@ func (_ stringUtils) pad(text string, width int) string {
 
 func (_ stringUtils) strNormal(text string, colWidth int) string {
 	text = strings.TrimSpace(text)
-	text = Utils.String.truncateString(text, "...", colWidth)
+	text = Utils.String.truncateString(text, colWidth, "...")
 	return text
 }
 
-func (_ stringUtils) truncateString(s, suffix string, maxWidth int) string {
-	if len(s) <= maxWidth {
-		return s
+func (_ stringUtils) truncateString(text string, maxWidth int, suffix string) string {
+	if len(text) <= maxWidth {
+		return text
 	}
 
 	suffixWidth := len(suffix)
 
 	if maxWidth <= suffixWidth {
-		return s[:maxWidth]
+		return text[:maxWidth]
 	}
 
-	return s[:maxWidth-suffixWidth] + suffix
+	return text[:maxWidth-suffixWidth] + suffix
 }
 
 func (_ stringUtils) calcMax(rows [][]string) int {
