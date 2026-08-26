@@ -81,6 +81,15 @@ func (this *info[T, O]) Id() (string, bool) {
 	return "", false
 }
 
+func (this *info[T, O]) ScrollToId(id string) {
+	for row, item := range this.Items {
+		if this.idFunc(item) == id {
+			this.data.Select(row+1, 0)
+			break
+		}
+	}
+}
+
 func (this *info[T, O]) Header() *tview.TextView {
 	return this.header
 }
@@ -140,4 +149,6 @@ func (this *info[T, O]) Set(items []T) {
 			this.data.SetCell(row, col, cell)
 		}
 	}
+
+	this.data.ScrollToBeginning()
 }

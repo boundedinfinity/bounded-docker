@@ -43,7 +43,7 @@ func (this *inspect) Value() (string, bool) {
 		return "", false
 	}
 
-	value := this.rows[row][1]
+	value := this.rows[row][2]
 	return value, value != ""
 }
 
