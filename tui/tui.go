@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/boundedinfinity/docker-tui/docker"
 	"github.com/boundedinfinity/docker-tui/state"
@@ -31,8 +32,10 @@ type tui struct {
 	errors                  Info
 	sm                      *state.Machine
 	status                  *tview.TextView
-	menu                    *tview.Flex
+	toast                   *tview.TextView
+	header                  *tview.Flex
 	nav                     *tview.Pages
+	navTables               map[string]*tview.Table
 	pages                   *tview.Pages
 	current                 string
 	screen                  tcell.Screen
@@ -244,19 +247,20 @@ func (this *tui) handleRedraw(screen tcell.Screen) bool {
 // support, which not every terminal honors.
 func (this *tui) copyToClipboard(text string) {
 	if this.screen == nil {
-		this.setStatus("clipboard unavailable")
+		this.setStatusf("clipboard unavailable")
 		return
 	}
 
 	this.screen.SetClipboard([]byte(text))
-	this.setStatusf("copied %d chars", len(text))
+	this.setToastf("copied %q", Utils.String.clamp(text, 50))
 }
 
 func (this *tui) handleInput(event *tcell.EventKey) *tcell.EventKey {
 	key := Utils.Tview.tcellEvent2Str(event)
 	state, _ := this.sm.Next(key)
 
-	this.setStatus(state.Id)
+	this.highlightKey(key)
+	this.setStatusf("%s", state.Id)
 
 	if this.current != state.Id {
 		this.current = state.Id
@@ -264,4 +268,59 @@ func (this *tui) handleInput(event *tcell.EventKey) *tcell.EventKey {
 	}
 
 	return event
+}
+
+// highlightKey finds the given key code in the current navigation table and
+// briefly changes its cell color to a bright contrasting color, then fades back
+// to the normal color after 500ms.
+func (this *tui) highlightKey(keyCode string) {
+	table, ok := this.navTables[this.current]
+	if !ok {
+		return
+	}
+
+	highlightColor := tcell.ColorLimeGreen
+	normalColor := tcell.ColorWhite
+	normalKeyColor := tcell.ColorYellow
+
+	this.queueDraw(func() {
+		for r := 0; r < table.GetRowCount(); r++ {
+			for c := 0; c < table.GetColumnCount(); c++ {
+				cell := table.GetCell(r, c)
+				if cell == nil {
+					continue
+				}
+				if cell.Text == keyCode {
+					cell.SetTextColor(highlightColor)
+				}
+			}
+		}
+	})
+
+	// Schedule revert after 500ms
+	go func() {
+		select {
+		case <-this.ctx.Done():
+			return
+		case <-time.After(500 * time.Millisecond):
+		}
+
+		this.queueDraw(func() {
+			for r := 0; r < table.GetRowCount(); r++ {
+				for c := 0; c < table.GetColumnCount(); c++ {
+					cell := table.GetCell(r, c)
+					if cell == nil {
+						continue
+					}
+					if cell.Text == keyCode {
+						if c%2 == 0 {
+							cell.SetTextColor(normalColor)
+						} else {
+							cell.SetTextColor(normalKeyColor)
+						}
+					}
+				}
+			}
+		})
+	}()
 }

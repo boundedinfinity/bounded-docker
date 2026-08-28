@@ -3,22 +3,36 @@ package tui
 import (
 	"fmt"
 
+	"github.com/boundedinfinity/go-commoner/errorer"
 	"github.com/rivo/tview"
 )
 
-func newInfo[T any, O any](
-	tui *tui, title string, headers []string,
-	options O,
-	rowFn func(i int, item T) []string,
+type Info interface {
+	Queue(any)
+	Update(any)
+	Header() *tview.TextView
+	Data() *tview.Table
+	Id() (string, bool)
+}
+
+// /////////////////////////////////////////////////////////////////////////////////////////////////
+
+var (
+	ErrInfoList   = fmt.Errorf("info list")
+	errInfoListFn = errorer.Func(ErrInfoList)
+)
+
+func newInfoList[T any, O any](
+	tui *tui, title string, options O,
+	rowsFn func(items []T) [][]string,
 	idFn func(item T) string,
 ) Info {
 	info := &info[T, O]{
 		Title:   title,
 		Items:   []T{},
 		options: options,
-		headers: headers,
 		tui:     tui,
-		rowFunc: rowFn,
+		rowsFn:  rowsFn,
 		idFunc:  idFn,
 	}
 
@@ -26,22 +40,13 @@ func newInfo[T any, O any](
 
 	info.data = tview.NewTable().
 		SetBorders(true).
-		SetFixed(1, len(headers)).
+		SetFixed(1, 1).
 		SetEvaluateAllRows(true).
 		SetSelectable(true, false)
 
-	info.Set([]T{})
+	info.Update([]T{})
 
 	return info
-}
-
-type Info interface {
-	Queue(items any)
-	Update(items any)
-	Focus()
-	Header() *tview.TextView
-	Data() *tview.Table
-	Id() (string, bool)
 }
 
 type info[T any, O any] struct {
@@ -50,11 +55,10 @@ type info[T any, O any] struct {
 	item        T
 	options     O
 	tui         *tui
-	headers     []string
 	header      *tview.TextView
 	data        *tview.Table
 	idFunc      func(T) string
-	rowFunc     func(int, T) []string
+	rowsFn      func([]T) [][]string
 	initFunc    func()
 	colWidth    int
 	zero        T
@@ -98,18 +102,8 @@ func (this *info[T, O]) Data() *tview.Table {
 	return this.data
 }
 
-func (this *info[T, O]) Focus() {
-	this.tui.app.SetFocus(this.data)
-}
-
 func (this *info[T, O]) rows() ([][]string, int) {
-	data := [][]string{this.headers}
-
-	for i, item := range this.Items {
-		data = append(data, this.rowFunc(i, item))
-	}
-
-	return data, len(this.Items)
+	return this.rowsFn(this.Items), len(this.Items)
 }
 
 func (this *info[T, O]) Queue(items any) {
@@ -118,26 +112,126 @@ func (this *info[T, O]) Queue(items any) {
 	})
 }
 
-func (this *info[T, O]) Update(items any) {
-	switch v := any(items).(type) {
+func (this *info[T, O]) Update(a any) {
+	switch items := any(a).(type) {
 	case T:
-		this.Set([]T{v})
+		this.Items = []T{items}
 	case []T:
-		this.Set(v)
+		this.Items = items
 	case nil:
-		this.Set([]T{})
+		this.Items = []T{}
+	default:
+		panic(errInfoListFn(
+			"invalid type: %T, expected %T or []%T",
+			a, this.zero, this.zero,
+		))
 	}
-}
 
-func (this *info[T, O]) Set(items []T) {
-	this.Items = items
-	data, count := this.rows()
+	rows, count := this.rows()
 
 	this.header.Clear()
 	fmt.Fprintf(this.header, "%s [%d]", this.Title, count)
 
 	this.data.Clear()
-	for row, vals := range data {
+	this.data.SetFixed(1, len(rows[0]))
+	for row, vals := range rows {
+		for col, text := range vals {
+			cell := tview.NewTableCell(text)
+			cell.SetExpansion(1)
+
+			if row == 0 {
+				cell.SetSelectable(false)
+			}
+
+			this.data.SetCell(row, col, cell)
+		}
+	}
+
+	this.data.ScrollToBeginning()
+}
+
+// /////////////////////////////////////////////////////////////////////////////////////////////////
+
+var (
+	ErrInfoItem   = fmt.Errorf("info item")
+	errInfoItemFn = errorer.Func(ErrInfoItem)
+)
+
+func newInfoItem[T any](
+	tui *tui, title string,
+	rowsFunc func(T) [][]string,
+	idFn func(item T) string,
+) Info {
+	info := &infoItem[T]{
+		title:    title,
+		tui:      tui,
+		rowsFunc: rowsFunc,
+		idFunc:   idFn,
+	}
+
+	info.header = tview.NewTextView()
+
+	info.data = tview.NewTable().
+		SetBorders(true).
+		SetFixed(1, 3).
+		SetEvaluateAllRows(true).
+		SetSelectable(true, false)
+
+	return info
+}
+
+type infoItem[T any] struct {
+	item     T
+	tui      *tui
+	title    string
+	header   *tview.TextView
+	data     *tview.Table
+	idFunc   func(T) string
+	rowsFunc func(T) [][]string
+}
+
+func (this *infoItem[T]) Id() (string, bool) {
+	if this.idFunc == nil {
+		panic(errInfoItemFn("idFunc is nil"))
+	}
+
+	return this.idFunc(this.item), true
+}
+
+func (this *infoItem[T]) Header() *tview.TextView {
+	return this.header
+}
+
+func (this *infoItem[T]) Data() *tview.Table {
+	return this.data
+}
+
+func (this *infoItem[T]) Queue(a any) {
+	this.tui.queueDraw(func() {
+		this.Update(a)
+	})
+}
+
+func (this *infoItem[T]) Update(a any) {
+	if this.rowsFunc == nil {
+		panic(errInfoItemFn("rowsFunc is nil"))
+	}
+
+	if item, ok := a.(T); ok {
+		this.item = item
+	} else {
+		var zero T
+		panic(errInfoItemFn("invalid type: %T, expected: %T", a, zero))
+	}
+
+	id, _ := this.Id()
+	title := fmt.Sprintf("%s [%s]", this.title, id)
+	this.header.Clear()
+	fmt.Fprintf(this.header, "%s", title)
+
+	rows := this.rowsFunc(this.item)
+	this.data.Clear()
+	for row, vals := range rows {
 		for col, text := range vals {
 			cell := tview.NewTableCell(text)
 			cell.SetExpansion(1)

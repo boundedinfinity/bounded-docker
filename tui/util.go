@@ -237,6 +237,14 @@ func (_ stringUtils) strNormal(text string, colWidth int) string {
 	return text
 }
 
+func (this stringUtils) clamp(text string, maxWidth int) string {
+	if len(text) <= maxWidth {
+		return text
+	}
+
+	return this.truncateString(text, maxWidth, "...")
+}
+
 func (_ stringUtils) truncateString(text string, maxWidth int, suffix string) string {
 	if len(text) <= maxWidth {
 		return text
@@ -424,9 +432,16 @@ func (_ errorUtils) id(err error) string {
 	return ""
 }
 
-func (_ errorUtils) error2Row(i int, err error) []string {
-	return []string{
-		Utils.index2Str(i),
-		err.Error(),
+func (_ errorUtils) error2rows(errs []error) [][]string {
+	rows := [][]string{}
+	rows = append(rows, []string{"#", "Error"})
+
+	for i, err := range errs {
+		rows = append(rows, []string{
+			Utils.index2Str(i),
+			err.Error(),
+		})
 	}
+
+	return rows
 }

@@ -6,49 +6,22 @@ import (
 
 type imageUtils struct{}
 
-func (_ imageUtils) titles() []string {
-	return []string{"#", "ID", "Image", "Size"}
-}
-
 func (_ imageUtils) id(summary image.Summary) string {
 	return summary.ID
 }
 
-func (_ imageUtils) summary2row(i int, summary image.Summary) []string {
-	return []string{
-		Utils.index2Str(i),
-		summary.ID,
-		Utils.Docker.repoTags2Str(summary.RepoTags),
-		Utils.size2Str(summary.Size),
+func (_ imageUtils) summary2rows(summaries []image.Summary) [][]string {
+	rows := [][]string{}
+	rows = append(rows, []string{"#", "ID", "Image", "Size"})
+
+	for i, summary := range summaries {
+		rows = append(rows, []string{
+			Utils.index2Str(i),
+			summary.ID,
+			Utils.Docker.repoTags2Str(summary.RepoTags),
+			Utils.size2Str(summary.Size),
+		})
 	}
-}
-
-func (_ imageUtils) summary2rows(summary image.Summary) [][]string {
-	rows := [][]string{{"#", "Key", "Value"}}
-	index := 1
-
-	rows, index = Utils.Tview.multiRowi(rows, index, "ID", summary.ID)
-	rows, index = Utils.Tview.multiRowi(rows, index, "Repository Tags", summary.RepoTags...)
-	rows, index = Utils.Tview.multiRowi(rows, index, "Size", Utils.size2Str(summary.Size))
-	rows, index = Utils.Tview.multiRowi(rows, index, "Repository Digests", summary.RepoDigests...)
 
 	return rows
-}
-
-func (_ imageUtils) fake() []image.Summary {
-	return []image.Summary{}
-
-	// return []image.Summary{
-	// 	{
-	// 		ID:          "id",
-	// 		RepoTags:    []string{"tag1", "tag2"},
-	// 		RepoDigests: []string{"digest1", "digest2"},
-	// 		ParentID:    "parent_id",
-	// 		Created:     0,
-	// 		Size:        100,
-	// 		SharedSize:  100,
-	// 		Labels:      map[string]string{"label1": "value1", "label2": "value2"},
-	// 		Containers:  10,
-	// 	},
-	// }
 }
