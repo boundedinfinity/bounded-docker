@@ -21,16 +21,6 @@ func New(wg *sync.WaitGroup, ctx context.Context, cancel context.CancelFunc, sm 
 		app:    app,
 		sm:     sm,
 		cancel: cancel,
-		root: newWelcome(
-			"Use the navigation items below to view:",
-			"",
-			"  - Containers",
-			"  - Images",
-			"  - Networks",
-			"  - Errors",
-		),
-		status: tview.NewTextView().SetText("Welcome"),
-		toast:  tview.NewTextView().SetText(""),
 		wg:     wg,
 		containerLogsOptions: moby.ContainerLogsOptions{
 			ShowStdout: true,
@@ -40,24 +30,8 @@ func New(wg *sync.WaitGroup, ctx context.Context, cancel context.CancelFunc, sm 
 		},
 	}
 
-	tui.containers = newInfoList(tui, "Containers",
-		moby.ContainerListOptions{All: true},
-		Utils.Container.summary2rows, Utils.Container.id)
-	tui.images = newInfoList(tui, "Images", moby.ImageListOptions{},
-		Utils.Image.summary2rows, Utils.Image.id)
-	tui.networks = newInfoList(tui, "Networks", moby.NetworkListOptions{},
-		Utils.Network.summary2rows, Utils.Network.id)
-	tui.errors = newInfoList(tui, "Errors", int(0), Utils.Error.error2rows, nil)
-
-	tui.pages = tview.NewPages().
-		AddPage("root", tui.root, true, true).
-		AddPage("container.list", tui.containers.Data(), true, false).
-		AddPage("image.list", tui.images.Data(), true, false).
-		AddPage("network.list", tui.networks.Data(), true, false).
-		AddPage("errors", tui.errors.Data(), true, false).
-		SwitchToPage(tui.sm.StartState().Id)
-
-	tui.header = tui.newHeader(tui.status, tui.toast, []Info{tui.containers, tui.images, tui.networks, tui.errors})
+	tui.newMain()
+	tui.header = tui.newHeader()
 	tui.nav = tui.newNavigation()
 
 	layout := tview.NewFlex().
@@ -101,6 +75,33 @@ func newWelcome(lines ...string) tview.Primitive {
 		AddItem(nil, 0, 1, false)
 }
 
+func (this *tui) newMain() {
+	this.root = newWelcome(
+		"Use the navigation items below to view:",
+		"",
+		"  - Containers",
+		"  - Images",
+		"  - Networks",
+		"  - Errors",
+	)
+
+	this.containers = newInfoList(this, "Containers", moby.ContainerListOptions{All: true},
+		Utils.Container.summary2rows, Utils.Container.id)
+	this.images = newInfoList(this, "Images", moby.ImageListOptions{},
+		Utils.Image.summary2rows, Utils.Image.id)
+	this.networks = newInfoList(this, "Networks", moby.NetworkListOptions{},
+		Utils.Network.summary2rows, Utils.Network.id)
+	this.errors = newInfoList(this, "Errors", int(0), Utils.Error.error2rows, nil)
+
+	this.pages = tview.NewPages().
+		AddPage("root", this.root, true, true).
+		AddPage("container.list", this.containers.Data(), true, false).
+		AddPage("image.list", this.images.Data(), true, false).
+		AddPage("network.list", this.networks.Data(), true, false).
+		AddPage("errors", this.errors.Data(), true, false).
+		SwitchToPage(this.sm.StartState().Id)
+}
+
 func (this *tui) newNavigation() *tview.Pages {
 	pages := tview.NewPages()
 	pages.SetBorder(true).SetTitle(" [ Navigation ] ")
@@ -120,29 +121,38 @@ func (this *tui) setStatusf(format string, a ...any) {
 		fmt.Fprintf(this.status, format, a...)
 	})
 }
+
 func (this *tui) setToastf(format string, a ...any) {
 	this.queueDraw(func() {
 		this.toast.Clear()
 		fmt.Fprintf(this.toast, format, a...)
 	})
 }
-func (this *tui) newHeader(status, toast tview.Primitive, items []Info) *tview.Flex {
-	menu := tview.NewFlex().
-		SetDirection(tview.FlexColumn).
-		AddItem(tview.NewTextView(), 0, 1, false).
-		AddItem(status, 0, 2, false).
-		AddItem(toast, 0, 2, false)
 
-	menu.SetBorder(true).SetTitle(" [ Bounded Docker ] ")
+func (this *tui) newHeader() *tview.Flex {
+	this.status = tview.NewTextView().SetText(this.sm.Current.Id)
+	this.toast = tview.NewTextView().SetText("toast")
 
+	left := tview.NewFlex().
+		SetDirection(tview.FlexRow).
+		AddItem(this.status, 0, 1, false).
+		AddItem(this.toast, 0, 1, false)
+
+	right := tview.NewFlex().
+		SetDirection(tview.FlexRow)
+
+	items := []Info{this.containers, this.images, this.networks, this.errors}
 	for _, info := range items {
-		menu.AddItem(info.Header(), 0, 1, false)
+		right.AddItem(info.Header(), 0, 1, false)
 	}
 
-	menu.
+	header := tview.NewFlex().
+		SetDirection(tview.FlexColumn).
+		AddItem(left, 0, 1, false).
 		AddItem(tview.NewTextView(), 0, 1, false).
-		SetBorder(true).
-		SetTitle(" [ Bounded Docker ] ")
+		AddItem(right, 0, 1, false)
 
-	return menu
+	header.SetBorder(true).SetTitle(" [ Bounded Docker ] ")
+
+	return header
 }
